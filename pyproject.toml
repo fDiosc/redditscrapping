@@ -1,0 +1,24 @@
+[project]
+name = "radar"
+version = "0.1.0"
+description = "Automated lead and pain point discovery tool"
+readme = "README.md"
+requires-python = ">=3.10"
+dependencies = [
+    "typer[all]",
+    "praw",
+    "requests",
+    "beautifulsoup4",
+    "chromadb",
+    "openai",
+    "python-dotenv",
+    "rich",
+    "pandas",
+    "numpy"
+]
+
+[tool.setuptools]
+packages = ["radar"]
+
+[project.scripts]
+radar = "radar.cli:app"
