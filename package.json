@@ -1,0 +1,10 @@
+{
+    "name": "radar-root",
+    "version": "1.0.0",
+    "private": true,
+    "scripts": {
+        "dev": "npm run dev --prefix web",
+        "build": "npm run build --prefix web",
+        "serve": "radar serve"
+    }
+}

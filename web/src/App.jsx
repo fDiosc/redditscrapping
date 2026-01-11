@@ -24,11 +24,33 @@ function App() {
   const [threads, setThreads] = useState([]);
   const [loading, setLoading] = useState(false);
   const [syncing, setSyncing] = useState(false);
+  const [syncStatus, setSyncStatus] = useState({ is_running: false, current_step: "Idle", progress: 0 });
 
   useEffect(() => {
     fetchConfig();
     fetchThreads();
   }, [selectedProduct]);
+
+  // Status Polling
+  useEffect(() => {
+    let interval;
+    if (syncing) {
+      interval = setInterval(async () => {
+        try {
+          const res = await axios.get(`${API_BASE}/sync/status`);
+          setSyncStatus(res.data);
+          if (!res.data.is_running && res.data.progress === 100) {
+            setSyncing(false);
+            fetchThreads(); // Refresh list when done
+            clearInterval(interval);
+          }
+        } catch (err) {
+          console.error("Polling error", err);
+        }
+      }, 1000);
+    }
+    return () => clearInterval(interval);
+  }, [syncing]);
 
   const fetchConfig = async () => {
     try {
@@ -53,14 +75,13 @@ function App() {
   const handleSync = async () => {
     setSyncing(true);
     try {
-      // Simplified sync trigger
       const subParams = selectedSubs.map(s => `subreddits=${s}`).join('&');
-      await axios.post(`${API_BASE}/sync?${subParams}&days=${days}`);
-      alert("Sync started in background!");
+      const repParams = selectedReports.map(r => `reports=${r}`).join('&');
+      await axios.post(`${API_BASE}/sync?${subParams}&${repParams}&days=${days}`);
     } catch (err) {
-      alert("Sync failed");
+      alert("Sync failed: " + (err.response?.data?.error || err.message));
+      setSyncing(false);
     }
-    setSyncing(false);
   };
 
   const toggleReport = (type) => {
@@ -115,8 +136,8 @@ function App() {
                   key={type}
                   onClick={() => toggleReport(type)}
                   className={`w-full flex items-center justify-between p-3 rounded-lg border transition-all ${selectedReports.includes(type)
-                      ? 'bg-indigo-500/10 border-indigo-500 text-indigo-400'
-                      : 'bg-slate-800 border-slate-700 text-slate-400 hover:border-slate-600'
+                    ? 'bg-indigo-500/10 border-indigo-500 text-indigo-400'
+                    : 'bg-slate-800 border-slate-700 text-slate-400 hover:border-slate-600'
                     }`}
                 >
                   <span className="text-sm font-medium">{type.replace('_', ' ')}</span>
@@ -140,14 +161,40 @@ function App() {
             </div>
           </section>
 
-          <button
-            onClick={handleSync}
-            disabled={syncing}
-            className="w-full bg-indigo-600 hover:bg-indigo-500 disabled:bg-slate-700 text-white font-bold py-4 rounded-xl flex items-center justify-center gap-3 shadow-lg shadow-indigo-600/20 transition-all active:scale-95"
-          >
-            {syncing ? <RefreshCw className="animate-spin" /> : <Activity />}
-            {syncing ? "Syncing..." : "Run Intelligence Sync"}
-          </button>
+          <div className="space-y-4">
+            <button
+              onClick={handleSync}
+              disabled={syncing}
+              className={`w-full font-bold py-4 rounded-xl flex items-center justify-center gap-3 shadow-lg transition-all active:scale-95 ${syncing
+                  ? 'bg-slate-700 text-slate-400 cursor-not-allowed border border-slate-600'
+                  : 'bg-indigo-600 hover:bg-indigo-500 text-white shadow-indigo-600/20'
+                }`}
+            >
+              {syncing ? <RefreshCw className="animate-spin" /> : <Activity />}
+              {syncing ? "Syncing..." : "Run Intelligence Sync"}
+            </button>
+
+            {syncing && (
+              <div className="bg-slate-800/50 p-3 rounded-lg border border-slate-700/50 space-y-2 animate-in fade-in slide-in-from-bottom-2 duration-300">
+                <div className="flex justify-between text-[10px] font-bold uppercase tracking-wider">
+                  <span className="text-indigo-400 flex items-center gap-2">
+                    <span className="relative flex h-2 w-2">
+                      <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-indigo-400 opacity-75"></span>
+                      <span className="relative inline-flex rounded-full h-2 w-2 bg-indigo-500"></span>
+                    </span>
+                    {syncStatus.current_step}
+                  </span>
+                  <span className="text-slate-500">{syncStatus.progress}%</span>
+                </div>
+                <div className="w-full h-1 bg-slate-700 rounded-full overflow-hidden">
+                  <div
+                    className="h-full bg-gradient-to-r from-indigo-600 to-indigo-400 transition-all duration-500 ease-out"
+                    style={{ width: `${syncStatus.progress}%` }}
+                  ></div>
+                </div>
+              </div>
+            )}
+          </div>
         </div>
 
         <div className="mt-auto border-t border-slate-800 pt-6">

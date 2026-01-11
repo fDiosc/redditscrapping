@@ -45,6 +45,18 @@ async def get_threads(product: str = "profitdoctor", limit: int = 50):
     conn.close()
     return threads
 
+# Global state for sync tracking
+SYNC_STATE = {
+    "is_running": False,
+    "last_sync": None,
+    "current_step": "Idle",
+    "progress": 0
+}
+
+@app.get("/sync/status")
+async def get_sync_status():
+    return SYNC_STATE
+
 @app.post("/sync")
 async def sync_data(
     background_tasks: BackgroundTasks,
@@ -53,27 +65,52 @@ async def sync_data(
     reports: List[str] = Query(["DIRECT_FIT"])
 ):
     """Trigger ingestion, processing, and selective report generation."""
+    if SYNC_STATE["is_running"]:
+        return {"error": "Sync already in progress", "status": SYNC_STATE}
+
     from radar.ingest.reddit_scraper import RedditScraper
     from radar.cli import process as cli_process
     from radar.cli import report as cli_report
+    from datetime import datetime
 
     def run_sync():
-        scraper_tool = RedditScraper()
-        # 1. Ingest
-        for sub in subreddits:
-            scraper_tool.fetch_subreddit_posts(sub, limit=15, days=days)
-        
-        # 2. Process (includes change detection logic inside if updated)
-        cli_process()
+        try:
+            SYNC_STATE["is_running"] = True
+            SYNC_STATE["progress"] = 0
+            
+            scraper_tool = RedditScraper()
+            # 1. Ingest
+            for i, sub in enumerate(subreddits):
+                SYNC_STATE["current_step"] = f"Ingesting r/{sub}..."
+                SYNC_STATE["progress"] = int((i / len(subreddits)) * 40)
+                scraper_tool.fetch_subreddit_posts(sub, limit=15, days=days)
+            
+            # 2. Process
+            SYNC_STATE["current_step"] = "Analyzing and Scoring threads..."
+            SYNC_STATE["progress"] = 60
+            cli_process()
 
-        # 3. Generate Selected Reports
-        for report_type in reports:
-            # We assume profitdoctor for now or iterate over all products
-            for product in PRODUCTS.keys():
-                try:
-                    cli_report(product, mode=report_type)
-                except:
-                    pass
+            # 3. Generate Selected Reports
+            SYNC_STATE["current_step"] = "Generating reports..."
+            SYNC_STATE["progress"] = 80
+            for report_type in reports:
+                for product in PRODUCTS.keys():
+                    try:
+                        cli_report(product, mode=report_type)
+                    except:
+                        pass
+            
+            SYNC_STATE["last_sync"] = datetime.now().isoformat()
+            SYNC_STATE["current_step"] = "Success"
+            SYNC_STATE["progress"] = 100
+        except Exception as e:
+            SYNC_STATE["current_step"] = f"Error: {str(e)}"
+        finally:
+            # Keep the 100% or error message for a few seconds if polled, 
+            # but we allow new syncs after a reset or in the next call
+            import time
+            time.sleep(2) 
+            SYNC_STATE["is_running"] = False
 
     background_tasks.add_task(run_sync)
     return {"status": "Sync and Report generation started"}
