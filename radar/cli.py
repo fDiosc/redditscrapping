@@ -115,10 +115,12 @@ def process(batch: int = 50, ai_analyze: bool = True):
                 UPDATE posts 
                 SET embedding_id = ?, pain_signals = ?, intent = ?, 
                     relevance_score = ?, ai_analysis = ?, 
-                    semantic_similarity = ?, community_score = ?
+                    semantic_similarity = ?, community_score = ?,
+                    last_processed_score = ?, last_processed_comments = ?
                 WHERE id = ?
             """, (post['id'], json.dumps(signals), ",".join(signals['intents']), 
-                  relevance, ai_result, similarity, community_score, post['id']))
+                  relevance, ai_result, similarity, community_score,
+                  post['score'], post['num_comments'], post['id']))
             
         conn.commit()
         console.print(f"[green]✓ Processed batch {i//batch + 1}[/green]")
@@ -178,6 +180,13 @@ def report(product: str, mode: str = "DIRECT_FIT", limit: int = 15):
             f.write(f"### Context (Original Post)\n{row['body'][:600]}...\n\n---\n")
             
     console.print(f"[green]✓ {mode} report generated at {output_path}[/green]")
+
+@app.command()
+def serve(host: str = "127.0.0.1", port: int = 8000):
+    """Start the Radar API server."""
+    import uvicorn
+    console.print(f"Starting Radar API server at [bold]http://{host}:{port}[/bold]...")
+    uvicorn.run("radar.api.main:app", host=host, port=port, reload=True)
 
 if __name__ == "__main__":
     app()

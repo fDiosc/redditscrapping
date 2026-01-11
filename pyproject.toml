@@ -14,7 +14,9 @@ dependencies = [
     "python-dotenv",
     "rich",
     "pandas",
-    "numpy"
+    "numpy",
+    "fastapi",
+    "uvicorn"
 ]
 
 [tool.setuptools]

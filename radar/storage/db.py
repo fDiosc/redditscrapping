@@ -117,7 +117,12 @@ def get_unprocessed_posts():
     conn = get_connection()
     conn.row_factory = sqlite3.Row
     cursor = conn.cursor()
-    cursor.execute("SELECT * FROM posts WHERE embedding_id IS NULL")
+    cursor.execute("""
+        SELECT * FROM posts 
+        WHERE embedding_id IS NULL 
+        OR score != last_processed_score 
+        OR num_comments != last_processed_comments
+    """)
     rows = cursor.fetchall()
     conn.close()
     return [dict(row) for row in rows]
