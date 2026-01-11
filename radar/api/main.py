@@ -68,6 +68,7 @@ async def sync_data(
     if SYNC_STATE["is_running"]:
         return {"error": "Sync already in progress", "status": SYNC_STATE}
 
+    from radar.storage.db import init_db
     from radar.ingest.reddit_scraper import RedditScraper
     from radar.cli import process as cli_process
     from radar.cli import report as cli_report
@@ -75,6 +76,9 @@ async def sync_data(
 
     def run_sync():
         try:
+            # Ensure DB schema is up to date
+            init_db()
+            
             SYNC_STATE["is_running"] = True
             SYNC_STATE["progress"] = 0
             

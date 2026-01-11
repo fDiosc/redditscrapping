@@ -111,16 +111,27 @@ def process(batch: int = 50, ai_analyze: bool = True):
                 console.print(f"  [cyan]AI Analyzing High-Relevance post: {post['title'][:50]}... (Similarity: {similarity:.2f})[/cyan]")
                 ai_result = analyze_post_with_ai(post, product_key)
             
-            cursor.execute("""
-                UPDATE posts 
-                SET embedding_id = ?, pain_signals = ?, intent = ?, 
-                    relevance_score = ?, ai_analysis = ?, 
-                    semantic_similarity = ?, community_score = ?,
-                    last_processed_score = ?, last_processed_comments = ?
-                WHERE id = ?
-            """, (post['id'], json.dumps(signals), ",".join(signals['intents']), 
-                  relevance, ai_result, similarity, community_score,
-                  post['score'], post['num_comments'], post['id']))
+            try:
+                cursor.execute("""
+                    UPDATE posts 
+                    SET embedding_id = ?, pain_signals = ?, intent = ?, 
+                        relevance_score = ?, ai_analysis = ?, 
+                        semantic_similarity = ?, community_score = ?,
+                        last_processed_score = ?, last_processed_comments = ?
+                    WHERE id = ?
+                """, (post['id'], json.dumps(signals), ",".join(signals['intents']), 
+                      relevance, ai_result, similarity, community_score,
+                      post['score'], post['num_comments'], post['id']))
+            except sqlite3.OperationalError:
+                # Fallback to older schema
+                cursor.execute("""
+                    UPDATE posts 
+                    SET embedding_id = ?, pain_signals = ?, intent = ?, 
+                        relevance_score = ?, ai_analysis = ?, 
+                        semantic_similarity = ?, community_score = ?
+                    WHERE id = ?
+                """, (post['id'], json.dumps(signals), ",".join(signals['intents']), 
+                      relevance, ai_result, similarity, community_score, post['id']))
             
         conn.commit()
         console.print(f"[green]✓ Processed batch {i//batch + 1}[/green]")

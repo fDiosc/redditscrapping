@@ -6,6 +6,8 @@ def get_connection():
     return sqlite3.connect(DATABASE_PATH)
 
 def init_db():
+    from radar.config import DATABASE_PATH
+    print(f"DEBUG: Initializing database at {DATABASE_PATH}")
     conn = get_connection()
     cursor = conn.cursor()
     
@@ -117,12 +119,17 @@ def get_unprocessed_posts():
     conn = get_connection()
     conn.row_factory = sqlite3.Row
     cursor = conn.cursor()
-    cursor.execute("""
-        SELECT * FROM posts 
-        WHERE embedding_id IS NULL 
-        OR score != last_processed_score 
-        OR num_comments != last_processed_comments
-    """)
+    try:
+        cursor.execute("""
+            SELECT * FROM posts 
+            WHERE embedding_id IS NULL 
+            OR score != last_processed_score 
+            OR num_comments != last_processed_comments
+        """)
+    except sqlite3.OperationalError:
+        # Fallback if columns don't exist yet
+        cursor.execute("SELECT * FROM posts WHERE embedding_id IS NULL")
+    
     rows = cursor.fetchall()
     conn.close()
     return [dict(row) for row in rows]

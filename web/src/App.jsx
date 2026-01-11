@@ -39,9 +39,9 @@ function App() {
         try {
           const res = await axios.get(`${API_BASE}/sync/status`);
           setSyncStatus(res.data);
-          if (!res.data.is_running && res.data.progress === 100) {
+          if (!res.data.is_running) {
             setSyncing(false);
-            fetchThreads(); // Refresh list when done
+            if (res.data.progress === 100) fetchThreads();
             clearInterval(interval);
           }
         } catch (err) {
@@ -166,8 +166,8 @@ function App() {
               onClick={handleSync}
               disabled={syncing}
               className={`w-full font-bold py-4 rounded-xl flex items-center justify-center gap-3 shadow-lg transition-all active:scale-95 ${syncing
-                  ? 'bg-slate-700 text-slate-400 cursor-not-allowed border border-slate-600'
-                  : 'bg-indigo-600 hover:bg-indigo-500 text-white shadow-indigo-600/20'
+                ? 'bg-slate-700 text-slate-400 cursor-not-allowed border border-slate-600'
+                : 'bg-indigo-600 hover:bg-indigo-500 text-white shadow-indigo-600/20'
                 }`}
             >
               {syncing ? <RefreshCw className="animate-spin" /> : <Activity />}
