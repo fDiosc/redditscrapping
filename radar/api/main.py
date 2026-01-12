@@ -1,6 +1,8 @@
-from fastapi import FastAPI, BackgroundTasks, Query
+from fastapi import FastAPI, BackgroundTasks, Query, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from typing import List, Optional
+from radar.models.response import GenerateResponseRequest, FeedbackRequest
+from radar.services.response_service import ResponseGenerator
 import os
 import json
 from radar.storage.db import get_connection
@@ -46,16 +48,36 @@ async def get_threads(product: str = "profitdoctor", limit: int = 50):
     conn.row_factory = lambda cursor, row: dict(zip([col[0] for col in cursor.description], row))
     cursor = conn.cursor()
     
-    # We show threads joined with their product-specific analysis
+    # We show threads joined with their product-specific analysis and latest generated response
     cursor.execute("""
-        SELECT p.*, pa.relevance_score, pa.semantic_similarity, pa.community_score, pa.ai_analysis, pa.signals_json
+        SELECT p.*, pa.relevance_score, pa.semantic_similarity, pa.community_score, pa.ai_analysis, pa.signals_json,
+               r.id as res_id, r.response_text as res_text, r.style as res_style, r.tokens_used as res_tokens
         FROM posts p
         JOIN post_analysis pa ON p.id = pa.post_id
+        LEFT JOIN (
+            SELECT id, post_id, product_id, response_text, style, tokens_used,
+                   row_number() OVER (PARTITION BY post_id, product_id ORDER BY created_at DESC) as rn
+            FROM generated_responses
+        ) r ON p.id = r.post_id AND pa.product_id = r.product_id AND r.rn = 1
         WHERE pa.product_id = ? AND pa.relevance_score > 0 
         ORDER BY pa.relevance_score DESC 
         LIMIT ?
     """, (product, limit))
-    threads = cursor.fetchall()
+    rows = cursor.fetchall()
+    
+    threads = []
+    for row in rows:
+        thread = dict(row)
+        # Format the response if it exists
+        if thread.get('res_id'):
+            thread['generatedResponse'] = {
+                "id": thread['res_id'],
+                "response_text": thread['res_text'],
+                "style": thread['res_style'],
+                "tokens_used": thread['res_tokens']
+            }
+        threads.append(thread)
+        
     conn.close()
     return threads
 
@@ -111,7 +133,6 @@ async def sync_data(
             import time
             time.sleep(1)
             
-            SYNC_STATE["is_running"] = True
             SYNC_STATE["progress"] = 0
             update_sync_run_status(run_id, "Ingesting", 10)
             
@@ -170,8 +191,16 @@ async def sync_data(
             SYNC_STATE["is_running"] = False
             print("DEBUG: [Worker] Sync background task finalized.", flush=True)
 
+    SYNC_STATE["is_running"] = True
+    SYNC_STATE["progress"] = 0
+    SYNC_STATE["current_step"] = "Initializing..."
     background_tasks.add_task(run_sync)
     return {"status": "Sync and Report generation started"}
+
+@app.get("/sync/history")
+async def get_sync_history_api():
+    from radar.storage.db import get_sync_history
+    return get_sync_history()
 
 @app.get("/api/products")
 async def list_products_api():
@@ -227,3 +256,41 @@ async def list_reports():
     if not os.path.exists(reports_dir):
         return []
     return [f for f in os.listdir(reports_dir) if f.endswith(".md")]
+
+# RGIG Phase 1: Response Generation
+@app.post("/api/responses/generate/{post_id}")
+async def generate_response_api(post_id: str, request: GenerateResponseRequest):
+    generator = ResponseGenerator()
+    try:
+        result = generator.generate_response(post_id, request.product_id, request.style)
+        return result
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+@app.get("/api/responses/history/{post_id}")
+async def get_response_history_api(post_id: str, product_id: str, limit: int = 5):
+    from radar.storage.db import get_generated_responses
+    return get_generated_responses(post_id, product_id, limit)
+
+@app.post("/api/responses/{response_id}/feedback")
+async def submit_feedback_api(response_id: str, request: FeedbackRequest):
+    from radar.storage.db import update_response_feedback
+    update_response_feedback(response_id, request.feedback)
+    return {"status": "ok"}
+
+@app.get("/api/settings/{key}")
+async def get_setting_api(key: str):
+    from radar.storage.db import get_user_setting
+    return {"key": key, "value": get_user_setting(key)}
+
+class SettingRequest(BaseModel):
+    key: str
+    value: Any
+
+@app.post("/api/settings")
+async def save_setting_api(req: SettingRequest):
+    from radar.storage.db import save_user_setting
+    save_user_setting(req.key, req.value)
+    return {"status": "ok"}

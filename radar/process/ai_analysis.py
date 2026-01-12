@@ -15,6 +15,8 @@ def analyze_post_with_ai(unified_text: str, product_rec: Dict[str, Any]) -> str:
     Your goal is to analyze a Reddit thread (Post + Comments) and determine if it represents a high-quality lead for a specific product.
     
     You MUST respond with a valid JSON object only. No preamble, no markdown blocks.
+    Strictly avoid using the hyphen character (-) anywhere in the text fields. Use commas or periods instead.
+
     Structure:
     {
         "pain_point_summary": "1-2 sentence summary of the core problem",

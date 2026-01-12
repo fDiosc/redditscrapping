@@ -20,10 +20,84 @@ import {
   Edit,
   Globe,
   PlusCircle,
-  X
+  X,
+  Search,
+  TrendingUp,
+  Filter,
+  BarChart2,
+  Shield,
+  Calendar,
+  ArrowUp,
+  Layout,
+  Clock,
+  Sparkles,
+  Check,
+  Copy,
+  Loader2,
+  AlertCircle,
+  ThumbsUp,
+  ThumbsDown,
+  HelpCircle
 } from 'lucide-react';
 
 const API_BASE = "http://127.0.0.1:8000";
+
+const Tooltip = ({ text, children }) => {
+  const [show, setShow] = useState(false);
+  return (
+    <div className="relative inline-block group" onMouseEnter={() => setShow(true)} onMouseLeave={() => setShow(false)}>
+      {children}
+      {show && (
+        <div className="absolute z-[100] bottom-full left-1/2 -translate-x-1/2 mb-2 w-48 p-2 bg-slate-800 text-slate-200 text-[10px] font-medium rounded-lg border border-slate-700 shadow-2xl animate-in fade-in zoom-in duration-200">
+          <div className="relative z-10">{text}</div>
+          <div className="absolute top-full left-1/2 -translate-x-1/2 -mt-1 border-4 border-transparent border-t-slate-800"></div>
+        </div>
+      )}
+    </div>
+  );
+};
+
+const OnboardingWizard = ({ steps, onComplete }) => {
+  const [currentStep, setCurrentStep] = useState(0);
+  const step = steps[currentStep];
+
+  return (
+    <div className="fixed inset-0 z-[200] flex items-center justify-center p-4 bg-slate-950/80 backdrop-blur-sm animate-in fade-in duration-300">
+      <div className="w-full max-w-md bg-slate-900 border border-purple-500/30 rounded-2xl shadow-2xl overflow-hidden ring-1 ring-white/10 animate-in zoom-in-95 duration-300">
+        <div className="p-6">
+          <div className="flex justify-between items-center mb-6">
+            <div className="flex gap-1">
+              {steps.map((_, i) => (
+                <div key={i} className={`h-1 w-6 rounded-full transition-all ${i <= currentStep ? 'bg-purple-500 shadow-[0_0_8px_rgba(168,85,247,0.5)]' : 'bg-slate-800'}`}></div>
+              ))}
+            </div>
+            <button onClick={onComplete} className="text-slate-500 hover:text-white transition-colors">
+              <X size={20} />
+            </button>
+          </div>
+
+          <h3 className="text-xl font-black text-white mb-2 uppercase tracking-tight">{step.title}</h3>
+          <p className="text-slate-400 text-sm leading-relaxed mb-8">{step.content}</p>
+
+          <div className="flex justify-between items-center bg-slate-950/50 -mx-6 -mb-6 p-6 mt-4">
+            <button
+              onClick={currentStep === 0 ? onComplete : () => setCurrentStep(prev => prev - 1)}
+              className="text-xs font-bold text-slate-500 hover:text-white uppercase tracking-widest transition-colors"
+            >
+              {currentStep === 0 ? "Skip Intro" : "Previous"}
+            </button>
+            <button
+              onClick={currentStep === steps.length - 1 ? onComplete : () => setCurrentStep(prev => prev + 1)}
+              className="px-6 py-2 bg-purple-600 hover:bg-purple-500 text-white text-xs font-black uppercase tracking-widest rounded-lg transition-all shadow-lg shadow-purple-900/20 active:scale-95"
+            >
+              {currentStep === steps.length - 1 ? "Get Started" : "Next Step"}
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+};
 
 const CommentsSection = ({ postId }) => {
   const [comments, setComments] = useState([]);
@@ -260,9 +334,290 @@ const ProductManagement = ({ products, onEdit, onDelete, onCreate }) => {
   );
 };
 
+const GenerateResponseButton = ({ postId, productId, defaultStyle, onGenerated }) => {
+  const [loading, setLoading] = useState(false);
+
+  const handleGenerate = async () => {
+    setLoading(true);
+    try {
+      const resp = await axios.post(`${API_BASE}/api/responses/generate/${postId}`, {
+        product_id: productId,
+        style: defaultStyle
+      });
+      onGenerated(resp.data);
+    } catch (err) {
+      console.error(err);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  return (
+    <button
+      onClick={handleGenerate}
+      disabled={loading}
+      className="w-full mt-4 flex items-center justify-center gap-2 px-4 py-3 bg-purple-600 hover:bg-purple-700 disabled:bg-purple-800 text-white font-medium rounded-xl transition-all shadow-lg shadow-purple-900/20 active:scale-95"
+    >
+      {loading ? (
+        <><Loader2 size={18} className="animate-spin" /> Generating with GPT-5.2...</>
+      ) : (
+        <><Sparkles size={18} /> Generate Suggested Response</>
+      )}
+    </button>
+  );
+};
+
+const ResponseCard = ({ response, postUrl, onRegenerate, availableStyles, loading, error, postId, productId }) => {
+  const [copied, setCopied] = useState(false);
+  const [showStyles, setShowStyles] = useState(false);
+  const [targetStyle, setTargetStyle] = useState(null);
+  const [isEditing, setIsEditing] = useState(false);
+  const [displayResponse, setDisplayResponse] = useState(response);
+  const [editedText, setEditedText] = useState(response?.response_text || "");
+  const [showHistory, setShowHistory] = useState(false);
+  const [history, setHistory] = useState([]);
+
+  useEffect(() => {
+    if (response) {
+      setDisplayResponse(response);
+      setEditedText(response.response_text);
+    }
+  }, [response]);
+
+  useEffect(() => {
+    if (!loading) {
+      setTargetStyle(null);
+    }
+  }, [loading]);
+
+  const STYLE_LABELS = {
+    empathetic: '💜 Empathetic',
+    helpful_expert: '🎓 Helpful Expert',
+    casual: '😊 Casual',
+    technical: '🔧 Technical',
+    brief: '⚡ Brief'
+  };
+
+  const handleCopy = async () => {
+    if (loading || !displayResponse) return;
+    await navigator.clipboard.writeText(editedText);
+    setCopied(true);
+    setTimeout(() => setCopied(false), 2000);
+    // Explicitly log the copy action if no feedback given yet for THIS version
+    if (!displayResponse.feedback) {
+      axios.post(`${API_BASE}/api/responses/${displayResponse.id}/feedback`, { feedback: 'copied' });
+    }
+  };
+
+  const handleFeedback = async (val) => {
+    if (!displayResponse) return;
+
+    // Optimistically update the active response and its reflected feedback in history if visible
+    const updatedResp = { ...displayResponse, feedback: val };
+    setDisplayResponse(updatedResp);
+    if (history.length > 0) {
+      setHistory(prev => prev.map(h => h.id === displayResponse.id ? updatedResp : h));
+    }
+
+    try {
+      await axios.post(`${API_BASE}/api/responses/${displayResponse.id}/feedback`, { feedback: val });
+    } catch (err) { console.error("Feedback failed", err); }
+  };
+
+  const fetchHistory = async () => {
+    if (!showHistory) {
+      try {
+        const res = await axios.get(`${API_BASE}/api/responses/history/${postId}?product_id=${productId}`);
+        setHistory(res.data);
+      } catch (err) { console.error("History fetch failed", err); }
+    }
+    setShowHistory(!showHistory);
+  };
+
+  const handleStyleSelect = (style) => {
+    setTargetStyle(style);
+    onRegenerate(style);
+    setShowStyles(false);
+    setIsEditing(false);
+  };
+
+  return (
+    <div className={`mt-6 bg-slate-900/80 border border-slate-700/50 rounded-2xl animate-in fade-in slide-in-from-bottom-4 duration-500 relative ${loading ? 'opacity-90' : ''}`}>
+      {loading && (
+        <div className="absolute inset-0 z-50 flex flex-col items-center justify-center bg-slate-900/90 backdrop-blur-md rounded-2xl">
+          <div className="bg-purple-600/10 p-12 rounded-full absolute animate-ping duration-[3000ms]"></div>
+          <Loader2 className="animate-spin text-purple-400 mb-4 z-10" size={40} />
+          <div className="text-center z-10">
+            <span className="block text-sm font-black text-white uppercase tracking-widest animate-pulse">
+              Generating {targetStyle ? STYLE_LABELS[targetStyle].split(' ')[1] : 'Response'}...
+            </span>
+            <span className="block text-[10px] text-purple-400/60 mt-2 font-mono uppercase tracking-[0.2em] font-black">GPT-5.2 Deep Reasoning: active</span>
+          </div>
+        </div>
+      )}
+
+      {error && !loading && (
+        <div className="bg-red-500/10 border-b border-red-500/20 px-4 py-2 flex items-center gap-2 text-red-400 text-[10px] font-bold uppercase tracking-wider animate-in slide-in-from-top-full">
+          <AlertCircle size={14} /> {error}
+        </div>
+      )}
+
+      <div className="flex items-center justify-between px-4 py-3 border-b border-slate-700/50 bg-slate-800/40 rounded-t-2xl">
+        <div className="flex items-center gap-2">
+          <div className="flex items-center gap-2 text-purple-400">
+            <MessageSquare size={16} />
+            <span className="text-sm font-bold uppercase tracking-wider">Suggested Response</span>
+          </div>
+          <button
+            onClick={fetchHistory}
+            className="text-[10px] text-slate-500 hover:text-indigo-400 font-bold uppercase tracking-tighter transition-colors bg-slate-900/40 px-2 py-0.5 rounded border border-slate-700/50 ml-2"
+          >
+            {showHistory ? "Close History" : "View History"}
+          </button>
+        </div>
+        <div className="relative flex items-center gap-2">
+          <button
+            onClick={() => setIsEditing(!isEditing)}
+            className={`px-3 py-1.5 text-xs font-bold rounded-lg border transition-all ${isEditing ? 'bg-indigo-600 border-indigo-500 text-white' : 'bg-slate-800 border-slate-700 text-slate-400 hover:bg-slate-700'}`}
+          >
+            {isEditing ? 'Save View' : 'Edit'}
+          </button>
+          <div className="relative">
+            <button
+              onClick={() => !loading && setShowStyles(!showStyles)}
+              disabled={loading}
+              className="flex items-center gap-2 px-3 py-1.5 text-xs font-bold bg-slate-800 hover:bg-slate-700 rounded-lg border border-slate-700 transition-colors disabled:opacity-50"
+            >
+              {STYLE_LABELS[displayResponse?.style || response.style]}
+              <ChevronDown size={14} className={`transition-transform ${showStyles ? 'rotate-180' : ''}`} />
+            </button>
+            {showStyles && (
+              <div className="absolute right-0 top-full mt-2 w-48 bg-slate-800 border border-slate-700 rounded-xl shadow-2xl z-[60] py-2 overflow-hidden ring-1 ring-white/5">
+                {availableStyles.map(s => (
+                  <button
+                    key={s}
+                    onClick={() => handleStyleSelect(s)}
+                    className="w-full px-4 py-2 text-left text-xs font-medium hover:bg-purple-600/20 hover:text-purple-300 transition-colors"
+                  >
+                    {STYLE_LABELS[s]}
+                  </button>
+                ))}
+              </div>
+            )}
+          </div>
+        </div>
+      </div>
+
+      {showHistory && (
+        <div className="bg-slate-950/60 border-b border-slate-700/50 p-4 max-h-48 overflow-y-auto space-y-2 animate-in slide-in-from-top-4">
+          <p className="text-[10px] font-black text-slate-600 uppercase tracking-widest mb-3">Previous Generations</p>
+          {history.length === 0 ? <p className="text-xs italic text-slate-600">No previous versions found.</p> :
+            history.map((h, i) => (
+              <div key={h.id} className={`p-3 rounded-lg border transition-all cursor-pointer ${h.id === displayResponse?.id ? 'bg-purple-600/10 border-purple-500/50' : 'bg-slate-900/40 border-slate-800 hover:border-slate-700'}`}
+                onClick={() => {
+                  setDisplayResponse(h);
+                  setEditedText(h.response_text);
+                  setIsEditing(false);
+                }}
+              >
+                <div className="flex justify-between items-center mb-1">
+                  <div className="flex items-center gap-2">
+                    <span className="text-[10px] font-bold text-slate-400 capitalize">{h.style.replace('_', ' ')}</span>
+                    {h.feedback === 'good' && <ThumbsUp size={10} className="text-emerald-500" />}
+                    {h.feedback === 'bad' && <ThumbsDown size={10} className="text-red-500" />}
+                  </div>
+                  <span className="text-[10px] text-slate-600 font-mono">{new Date(h.created_at).toLocaleString()}</span>
+                </div>
+                <p className="text-xs text-slate-500 line-clamp-1 italic">"{h.response_text}"</p>
+              </div>
+            ))
+          }
+        </div>
+      )}
+
+      <div className="p-5">
+        {isEditing ? (
+          <textarea
+            className="w-full bg-slate-950/80 border border-indigo-500/30 rounded-xl p-4 text-sm text-slate-200 leading-relaxed outline-none focus:ring-2 focus:ring-indigo-600 h-48 transition-all scrollbar-thin scrollbar-thumb-slate-800"
+            value={editedText}
+            onChange={(e) => setEditedText(e.target.value)}
+            placeholder="Edit the suggested response..."
+          />
+        ) : (
+          <div className="bg-slate-950/50 rounded-xl p-4 text-sm text-slate-300 leading-relaxed border border-white/5 whitespace-pre-wrap min-h-[100px] relative">
+            {editedText}
+            {displayResponse && editedText !== displayResponse.response_text && (
+              <span className="absolute top-2 right-2 px-1.5 py-0.5 bg-indigo-600 text-[8px] font-black uppercase text-white rounded">Edited</span>
+            )}
+          </div>
+        )}
+        <div className="mt-3 flex items-center justify-between text-[10px] text-slate-500 font-mono">
+          <div className="flex gap-4">
+            <span>GPT-5.2 Reasoning: X-High</span>
+            <span>{displayResponse?.tokens_used || response.tokens_used} tokens</span>
+          </div>
+          {(displayResponse?.created_at || response.created_at) && (
+            <span>Generated {new Date(displayResponse?.created_at || response.created_at).toLocaleTimeString()}</span>
+          )}
+        </div>
+      </div>
+
+      <div className="flex items-center gap-2 px-4 py-3 bg-slate-800/40 border-t border-slate-700/50 rounded-b-2xl">
+        <button
+          onClick={handleCopy}
+          disabled={loading}
+          className="flex-1 flex items-center justify-center gap-2 px-4 py-2 bg-purple-600 hover:bg-purple-700 text-white text-xs font-bold rounded-lg transition-all active:scale-95 disabled:bg-purple-800/50"
+        >
+          {copied ? <><Check size={14} /> Copied!</> : <><Copy size={14} /> Copy to Clipboard</>}
+        </button>
+
+        <div className="flex items-center gap-1 bg-slate-900/60 p-1 rounded-lg border border-slate-700/50">
+          <button
+            onClick={() => handleFeedback('good')}
+            className={`p-1.5 rounded transition-all ${displayResponse?.feedback === 'good' ? 'bg-green-600 text-white shadow-lg shadow-green-900/20' : 'text-slate-500 hover:text-green-400 hover:bg-slate-800'}`}
+            title="Good Response"
+          >
+            <ThumbsUp size={14} />
+          </button>
+          <button
+            onClick={() => handleFeedback('bad')}
+            className={`p-1.5 rounded transition-all ${displayResponse?.feedback === 'bad' ? 'bg-red-600 text-white shadow-lg shadow-red-900/20' : 'text-slate-500 hover:text-red-400 hover:bg-slate-800'}`}
+            title="Poor Response"
+          >
+            <ThumbsDown size={14} />
+          </button>
+        </div>
+
+        <button
+          onClick={() => {
+            setTargetStyle(displayResponse?.style || response.style);
+            onRegenerate(displayResponse?.style || response.style);
+            setIsEditing(false);
+          }}
+          disabled={loading}
+          className="p-2 bg-slate-700 hover:bg-slate-600 text-slate-300 rounded-lg transition-colors disabled:opacity-50"
+          title="Regenerate"
+        >
+          <RefreshCw size={14} className={loading ? 'animate-spin' : ''} />
+        </button>
+        <a
+          href={postUrl}
+          target="_blank"
+          rel="noopener noreferrer"
+          className="p-2 bg-slate-700 hover:bg-slate-600 text-slate-300 rounded-lg transition-colors"
+          title="Open in Reddit"
+        >
+          <ExternalLink size={14} />
+        </a>
+      </div>
+    </div>
+  );
+};
+
 function App() {
   const [config, setConfig] = useState({ products: [], subreddits: [] });
   const [selectedProduct, setSelectedProduct] = useState("profitdoctor");
+  const [activeFilter, setActiveFilter] = useState("all");
   const [selectedSubs, setSelectedSubs] = useState(["shopify"]);
   const [selectedReports, setSelectedReports] = useState(["DIRECT_FIT", "INTENSITY"]);
   const [days, setDays] = useState(3);
@@ -277,6 +632,40 @@ function App() {
   const [products, setProducts] = useState([]);
   const [editingProduct, setEditingProduct] = useState(null);
   const [isModalOpen, setIsModalOpen] = useState(false);
+  const [showOnboarding, setShowOnboarding] = useState(false);
+
+  const discoverySteps = [
+    { title: "Welcome to Radar", content: "We've analyzed Reddit to find the best sales opportunities for you. Let's show you around!" },
+    { title: "Product Alignment", content: "The 'Fit %' represents how well a post aligns with your product goals based on AI analysis of pain points." },
+    { title: "Intensity Matters", content: "High Intensity means the user is actively looking for a solution RIGHT NOW." },
+    { title: "Social Selling", content: "Use the 'Suggested Response' to engage authentically. GPT-5.2 will help you sound like a genuine community member." }
+  ];
+
+  useEffect(() => {
+    const checkOnboarding = async () => {
+      try {
+        const res = await axios.get(`${API_BASE}/api/settings/onboarding_discovery_completed`);
+        if (!res.data.value || res.data.value === 'false') {
+          setShowOnboarding(true);
+        }
+      } catch (err) {
+        console.error("Failed to check onboarding", err);
+      }
+    };
+    checkOnboarding();
+  }, []);
+
+  const handleOnboardingComplete = async () => {
+    setShowOnboarding(false);
+    try {
+      await axios.post(`${API_BASE}/api/settings`, {
+        key: 'onboarding_discovery_completed',
+        value: 'true'
+      });
+    } catch (err) {
+      console.error("Failed to save onboarding status", err);
+    }
+  };
 
   useEffect(() => {
     fetchConfig();
@@ -343,7 +732,23 @@ function App() {
     setLoading(true);
     try {
       const res = await axios.get(`${API_BASE}/threads?product=${selectedProduct}`);
-      setThreads(res.data);
+      setThreads(prev => {
+        const regeneratingStates = prev.reduce((acc, t) => {
+          if (t.isRegenerating) acc[t.id] = t;
+          return acc;
+        }, {});
+
+        return res.data.map(newThread => {
+          if (regeneratingStates[newThread.id]) {
+            return {
+              ...newThread,
+              isRegenerating: true,
+              generatedResponse: regeneratingStates[newThread.id].generatedResponse
+            };
+          }
+          return { ...newThread, isRegenerating: false };
+        });
+      });
     } catch (err) {
       console.error("Failed to fetch threads", err);
     }
@@ -396,6 +801,13 @@ function App() {
     return b.relevance_score - a.relevance_score;
   });
 
+  const filteredThreads = sortedThreads.filter(t => {
+    if (activeFilter === "fit") return t.semantic_similarity > 0.5;
+    if (activeFilter === "intensity") return t.community_score > 3.0;
+    if (activeFilter === "score") return t.relevance_score > 15.0;
+    return true;
+  });
+
   const handleSync = async () => {
     console.log("Sync triggered. Product:", selectedProduct, "Subs:", selectedSubs, "Reports:", selectedReports);
     if (selectedSubs.length === 0) {
@@ -424,159 +836,163 @@ function App() {
   };
 
   return (
-    <div className="min-h-screen bg-slate-950 text-slate-200 flex">
+    <div className="h-screen bg-slate-950 text-slate-200 flex overflow-hidden">
       {/* Sidebar */}
-      <aside className="w-80 bg-slate-900 border-r border-slate-800 p-6 flex flex-col gap-8 shadow-xl">
-        <div className="flex items-center gap-3 text-indigo-400 mb-4">
-          <Radar size={32} />
-          <h1 className="text-2xl font-bold tracking-tight text-white">Radar AI</h1>
-        </div>
-
-        <div className="flex flex-col gap-2 mb-2">
-          <button
-            onClick={() => setView("dashboard")}
-            className={`flex items-center gap-3 p-3 rounded-lg transition-all ${view === "dashboard" ? "bg-indigo-600 text-white shadow-lg shadow-indigo-600/20" : "text-slate-400 hover:bg-slate-800"}`}
-          >
-            <Activity size={20} />
-            <span className="text-sm font-bold">Discovery Dashboard</span>
-          </button>
-          <button
-            onClick={() => setView("products")}
-            className={`flex items-center gap-3 p-3 rounded-lg transition-all ${view === "products" ? "bg-indigo-600 text-white shadow-lg shadow-indigo-600/20" : "text-slate-400 hover:bg-slate-800"}`}
-          >
-            <Settings size={20} />
-            <span className="text-sm font-bold">Product Settings</span>
-          </button>
-        </div>
-
-        <div className="space-y-6">
-          <section>
-            <label className="text-xs font-semibold uppercase tracking-wider text-slate-500 mb-2 block">Active Product</label>
-            <select
-              value={selectedProduct}
-              onChange={(e) => setSelectedProduct(e.target.value)}
-              className="w-full bg-slate-800 border border-slate-700 rounded-lg p-3 text-slate-200 focus:ring-2 focus:ring-indigo-500 outline-none transition-all"
-            >
-              {config.products.map(p => <option key={p} value={p}>{p.toUpperCase()}</option>)}
-            </select>
-          </section>
-
-          <section>
-            <label className="text-xs font-semibold uppercase tracking-wider text-slate-500 mb-2 block">Subreddits</label>
-            <div className="grid grid-cols-1 gap-2 max-h-40 overflow-y-auto p-1">
-              {config.subreddits.map(sub => (
-                <label key={sub} className="flex items-center gap-3 cursor-pointer hover:text-white transition-colors">
-                  <input
-                    type="checkbox"
-                    checked={selectedSubs.includes(sub)}
-                    onChange={() => setSelectedSubs(prev => prev.includes(sub) ? prev.filter(s => s !== sub) : [...prev, sub])}
-                    className="rounded border-slate-700 bg-slate-800 text-indigo-600 focus:ring-offset-slate-900"
-                  />
-                  <span className="text-sm">r/{sub}</span>
-                </label>
-              ))}
-            </div>
-          </section>
-
-          <section>
-            <label className="text-xs font-semibold uppercase tracking-wider text-slate-500 mb-2 block">Report Types</label>
-            <div className="space-y-2">
-              {["DIRECT_FIT", "OPPORTUNITY", "INTENSITY"].map(type => (
-                <button
-                  key={type}
-                  onClick={() => toggleReport(type)}
-                  className={`w-full flex items-center justify-between p-3 rounded-lg border transition-all ${selectedReports.includes(type)
-                    ? 'bg-indigo-500/10 border-indigo-500 text-indigo-400'
-                    : 'bg-slate-800 border-slate-700 text-slate-400 hover:border-slate-600'
-                    }`}
-                >
-                  <span className="text-sm font-medium">{type.replace('_', ' ')}</span>
-                  {selectedReports.includes(type) && <CheckCircle2 size={16} />}
-                </button>
-              ))}
-            </div>
-          </section>
-
-          <section>
-            <label className="text-xs font-semibold uppercase tracking-wider text-slate-500 mb-2 block">Scraping Range (Days)</label>
-            <input
-              type="range" min="1" max="14" value={days}
-              onChange={(e) => setDays(e.target.value)}
-              className="w-full h-2 bg-slate-800 rounded-lg appearance-none cursor-pointer accent-indigo-500"
-            />
-            <div className="flex justify-between text-[10px] text-slate-500 mt-1">
-              <span>1d</span>
-              <span>7d</span>
-              <span>14d</span>
-            </div>
-          </section>
-
-          <div className="space-y-4">
-            <button
-              onClick={handleSync}
-              disabled={syncing}
-              className={`w-full font-bold py-4 rounded-xl flex items-center justify-center gap-3 shadow-lg transition-all active:scale-95 ${syncing
-                ? 'bg-slate-700 text-slate-400 cursor-not-allowed border border-slate-600'
-                : 'bg-indigo-600 hover:bg-indigo-500 text-white shadow-indigo-600/20'
-                }`}
-            >
-              {syncing ? <RefreshCw className="animate-spin" /> : <Activity />}
-              {syncing ? "Syncing..." : "Run Intelligence Sync"}
-            </button>
-
-            {syncing && (
-              <div className="bg-slate-800/50 p-3 rounded-lg border border-slate-700/50 space-y-2 animate-in fade-in slide-in-from-bottom-2 duration-300">
-                <div className="flex justify-between text-[10px] font-bold uppercase tracking-wider">
-                  <span className="text-indigo-400 flex items-center gap-2">
-                    <span className="relative flex h-2 w-2">
-                      <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-indigo-400 opacity-75"></span>
-                      <span className="relative inline-flex rounded-full h-2 w-2 bg-indigo-500"></span>
-                    </span>
-                    {syncStatus.current_step}
-                  </span>
-                  <span className="text-slate-500">{syncStatus.progress}%</span>
-                </div>
-                <div className="w-full h-1 bg-slate-700 rounded-full overflow-hidden">
-                  <div
-                    className="h-full bg-gradient-to-r from-indigo-600 to-indigo-400 transition-all duration-500 ease-out"
-                    style={{ width: `${syncStatus.progress}%` }}
-                  ></div>
-                </div>
-              </div>
-            )}
+      <aside className="w-80 bg-slate-900 border-r border-slate-800 flex flex-col shadow-xl">
+        <div className="p-6 border-b border-slate-800 bg-slate-900/50 backdrop-blur-sm z-10">
+          <div className="flex items-center gap-3 text-indigo-400">
+            <Radar size={32} />
+            <h1 className="text-2xl font-bold tracking-tight text-white">Radar AI</h1>
           </div>
         </div>
 
-        <div className="mt-auto space-y-4">
-          <section className="border-t border-slate-800 pt-6">
-            <label className="text-xs font-semibold uppercase tracking-wider text-slate-500 mb-4 block flex items-center gap-2">
-              <RefreshCw size={14} /> Run History
-            </label>
-            <div className="space-y-3 max-h-60 overflow-y-auto pr-2 custom-scrollbar">
-              {history.length === 0 ? (
-                <p className="text-[10px] text-slate-600 italic">No past runs recorded.</p>
-              ) : (
-                history.map(run => (
-                  <div key={run.id} className="bg-slate-800/30 border border-slate-800 p-2 rounded-lg hover:border-slate-700 transition-all cursor-pointer group">
-                    <div className="flex justify-between items-start mb-1">
-                      <span className="text-[10px] font-bold text-indigo-400 truncate uppercase w-2/3">{run.product}</span>
-                      <span className="text-[9px] text-slate-500">{new Date(run.timestamp).toLocaleDateString([], { month: 'short', day: 'numeric' })}</span>
-                    </div>
-                    <div className="flex justify-between items-center">
-                      <span className="text-[9px] text-slate-400 truncate w-1/2">r/{run.subreddits}</span>
-                      <span className={`text-[8px] px-1.5 py-0.5 rounded-full font-bold uppercase ${run.status === 'Success' ? 'bg-emerald-500/10 text-emerald-500' :
-                        run.status.startsWith('Error') ? 'bg-red-500/10 text-red-500' : 'bg-indigo-500/10 text-indigo-400'
-                        }`}>
-                        {run.status.split(':')[0]}
+        <div className="flex-1 overflow-y-auto p-6 custom-scrollbar space-y-8">
+          <div className="flex flex-col gap-2">
+            <button
+              onClick={() => setView("dashboard")}
+              className={`flex items-center gap-3 p-3 rounded-lg transition-all ${view === "dashboard" ? "bg-indigo-600 text-white shadow-lg shadow-indigo-600/20" : "text-slate-400 hover:bg-slate-800"}`}
+            >
+              <Activity size={20} />
+              <span className="text-sm font-bold">Discovery Dashboard</span>
+            </button>
+            <button
+              onClick={() => setView("products")}
+              className={`flex items-center gap-3 p-3 rounded-lg transition-all ${view === "products" ? "bg-indigo-600 text-white shadow-lg shadow-indigo-600/20" : "text-slate-400 hover:bg-slate-800"}`}
+            >
+              <Settings size={20} />
+              <span className="text-sm font-bold">Product Settings</span>
+            </button>
+          </div>
+
+          <div className="space-y-6">
+            <section>
+              <label className="text-xs font-semibold uppercase tracking-wider text-slate-500 mb-2 block">Active Product</label>
+              <select
+                value={selectedProduct}
+                onChange={(e) => setSelectedProduct(e.target.value)}
+                className="w-full bg-slate-800 border border-slate-700 rounded-lg p-3 text-slate-200 focus:ring-2 focus:ring-indigo-500 outline-none transition-all"
+              >
+                {config.products.map(p => <option key={p} value={p}>{p.toUpperCase()}</option>)}
+              </select>
+            </section>
+
+            <section>
+              <label className="text-xs font-semibold uppercase tracking-wider text-slate-500 mb-2 block">Subreddits</label>
+              <div className="grid grid-cols-1 gap-2 max-h-40 overflow-y-auto p-1 custom-scrollbar">
+                {config.subreddits.map(sub => (
+                  <label key={sub} className="flex items-center gap-3 cursor-pointer hover:text-white transition-colors">
+                    <input
+                      type="checkbox"
+                      checked={selectedSubs.includes(sub)}
+                      onChange={() => setSelectedSubs(prev => prev.includes(sub) ? prev.filter(s => s !== sub) : [...prev, sub])}
+                      className="rounded border-slate-700 bg-slate-800 text-indigo-600 focus:ring-offset-slate-900"
+                    />
+                    <span className="text-sm">r/{sub}</span>
+                  </label>
+                ))}
+              </div>
+            </section>
+
+            <section>
+              <label className="text-xs font-semibold uppercase tracking-wider text-slate-500 mb-2 block">Report Types</label>
+              <div className="space-y-2">
+                {["DIRECT_FIT", "OPPORTUNITY", "INTENSITY"].map(type => (
+                  <button
+                    key={type}
+                    onClick={() => toggleReport(type)}
+                    className={`w-full flex items-center justify-between p-3 rounded-lg border transition-all ${selectedReports.includes(type)
+                      ? 'bg-indigo-500/10 border-indigo-500 text-indigo-400'
+                      : 'bg-slate-800 border-slate-700 text-slate-400 hover:border-slate-600'
+                      }`}
+                  >
+                    <span className="text-sm font-medium">{type.replace('_', ' ')}</span>
+                    {selectedReports.includes(type) && <CheckCircle2 size={16} />}
+                  </button>
+                ))}
+              </div>
+            </section>
+
+            <section>
+              <label className="text-xs font-semibold uppercase tracking-wider text-slate-500 mb-2 block">Scraping Range (Days)</label>
+              <input
+                type="range" min="1" max="14" value={days}
+                onChange={(e) => setDays(e.target.value)}
+                className="w-full h-2 bg-slate-800 rounded-lg appearance-none cursor-pointer accent-indigo-500"
+              />
+              <div className="flex justify-between text-[10px] text-slate-500 mt-1">
+                <span>1d</span>
+                <span>7d</span>
+                <span>14d</span>
+              </div>
+            </section>
+
+            <div className="space-y-4">
+              <button
+                onClick={handleSync}
+                disabled={syncing}
+                className={`w-full font-bold py-4 rounded-xl flex items-center justify-center gap-3 shadow-lg transition-all active:scale-95 ${syncing
+                  ? 'bg-slate-700 text-slate-400 cursor-not-allowed border border-slate-600'
+                  : 'bg-indigo-600 hover:bg-indigo-500 text-white shadow-indigo-600/20'
+                  }`}
+              >
+                {syncing ? <RefreshCw className="animate-spin" /> : <Activity />}
+                {syncing ? "Syncing..." : "Run Intelligence Sync"}
+              </button>
+
+              {syncing && (
+                <div className="bg-slate-800/50 p-3 rounded-lg border border-slate-700/50 space-y-2 animate-in fade-in slide-in-from-bottom-2 duration-300">
+                  <div className="flex justify-between text-[10px] font-bold uppercase tracking-wider">
+                    <span className="text-indigo-400 flex items-center gap-2">
+                      <span className="relative flex h-2 w-2">
+                        <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-indigo-400 opacity-75"></span>
+                        <span className="relative inline-flex rounded-full h-2 w-2 bg-indigo-500"></span>
                       </span>
-                    </div>
+                      {syncStatus.current_step}
+                    </span>
+                    <span className="text-slate-500">{syncStatus.progress}%</span>
                   </div>
-                ))
+                  <div className="w-full h-1 bg-slate-700 rounded-full overflow-hidden">
+                    <div
+                      className="h-full bg-gradient-to-r from-indigo-600 to-indigo-400 transition-all duration-500 ease-out"
+                      style={{ width: `${syncStatus.progress}%` }}
+                    ></div>
+                  </div>
+                </div>
               )}
             </div>
-          </section>
 
-          <div className="flex items-center gap-3 text-slate-500 hover:text-slate-300 transition-colors cursor-pointer pt-2">
+            <section className="border-t border-slate-800 pt-6">
+              <label className="text-xs font-semibold uppercase tracking-wider text-slate-500 mb-4 block flex items-center gap-2">
+                <RefreshCw size={14} /> Run History
+              </label>
+              <div className="space-y-3 max-h-80 overflow-y-auto pr-2 custom-scrollbar">
+                {history.length === 0 ? (
+                  <p className="text-[10px] text-slate-600 italic">No past runs recorded.</p>
+                ) : (
+                  history.map(run => (
+                    <div key={run.id} className="bg-slate-800/30 border border-slate-800 p-3 rounded-xl hover:border-slate-600 transition-all cursor-pointer group active:scale-95">
+                      <div className="flex justify-between items-start mb-2">
+                        <span className="text-[10px] font-black text-indigo-400 truncate uppercase w-2/3 tracking-tighter">{run.product}</span>
+                        <span className="text-[9px] text-slate-500 font-mono">{new Date(run.timestamp).toLocaleDateString([], { month: 'short', day: 'numeric' })}</span>
+                      </div>
+                      <div className="flex justify-between items-center">
+                        <span className="text-[9px] text-slate-400 truncate w-1/2 font-medium">r/{run.subreddits}</span>
+                        <span className={`text-[8px] px-2 py-0.5 rounded-full font-black uppercase tracking-widest ${run.status === 'Success' ? 'bg-emerald-500/10 text-emerald-500' :
+                          run.status.startsWith('Error') ? 'bg-red-500/10 text-red-500' : 'bg-indigo-500/10 text-indigo-400'
+                          }`}>
+                          {run.status.split(':')[0]}
+                        </span>
+                      </div>
+                    </div>
+                  ))
+                )}
+              </div>
+            </section>
+          </div>
+        </div>
+
+        <div className="p-6 border-t border-slate-800 bg-slate-900/50">
+          <div className="flex items-center gap-3 text-slate-500 hover:text-slate-300 transition-colors cursor-pointer">
             <Settings size={18} />
             <span className="text-sm">Advanced Settings</span>
           </div>
@@ -611,34 +1027,96 @@ function App() {
             </header>
 
             {/* Stats Grid */}
-            <div className="grid grid-cols-3 gap-6 mb-12">
-              <div className="bg-slate-900 p-6 rounded-2xl border border-slate-800 flex items-center justify-between shadow-sm">
-                <div>
-                  <p className="text-xs text-slate-500 uppercase tracking-widest mb-1">Max Intensity</p>
-                  <h3 className="text-3xl font-bold text-orange-400">
-                    {threads.length > 0 ? Math.max(...threads.map(t => t.community_score)).toFixed(1) : "0.0"}
-                  </h3>
+            <div className="grid grid-cols-5 gap-4 mb-12">
+              <Tooltip text="Measures the depth and frequency of problem discussion. Click to filter hot topics.">
+                <div
+                  onClick={() => {
+                    const newVal = activeFilter === "intensity" ? "all" : "intensity";
+                    setActiveFilter(newVal);
+                    setSortBy(newVal === "intensity" ? "intensity" : "relevance");
+                  }}
+                  className={`p-5 rounded-2xl border transition-all cursor-pointer flex items-center justify-between shadow-sm ${activeFilter === "intensity" ? "bg-indigo-600 border-indigo-400 shadow-indigo-500/20" : "bg-slate-900 border-slate-800 hover:border-indigo-500/30"
+                    }`}
+                >
+                  <div>
+                    <p className={`text-[10px] uppercase tracking-widest mb-1 flex items-center gap-1 ${activeFilter === "intensity" ? "text-indigo-100" : "text-slate-500"}`}>
+                      High Intensity <HelpCircle size={10} />
+                    </p>
+                    <h3 className={`text-2xl font-bold ${activeFilter === "intensity" ? "text-white" : "text-orange-400"}`}>
+                      {threads.filter(t => t.community_score > 3.0).length}
+                    </h3>
+                  </div>
+                  <BarChart3 size={24} className={activeFilter === "intensity" ? "text-white/40" : "text-slate-700"} />
                 </div>
-                <BarChart3 size={32} className="text-slate-700" />
-              </div>
-              <div className="bg-slate-900 p-6 rounded-2xl border border-slate-800 flex items-center justify-between shadow-sm">
-                <div>
-                  <p className="text-xs text-slate-500 uppercase tracking-widest mb-1">High Fit Leads</p>
-                  <h3 className="text-3xl font-bold text-emerald-400">
-                    {threads.filter(t => t.semantic_similarity > 0.5).length}
-                  </h3>
+              </Tooltip>
+
+              <Tooltip text="Number of posts that directly match your product signals. Click to filter.">
+                <div
+                  onClick={() => {
+                    const newVal = activeFilter === "fit" ? "all" : "fit";
+                    setActiveFilter(newVal);
+                    setSortBy(newVal === "fit" ? "fit" : "relevance");
+                  }}
+                  className={`p-5 rounded-2xl border transition-all cursor-pointer flex items-center justify-between shadow-sm ${activeFilter === "fit" ? "bg-indigo-600 border-indigo-400 shadow-indigo-500/20" : "bg-slate-900 border-slate-800 hover:border-indigo-500/30"
+                    }`}
+                >
+                  <div>
+                    <p className={`text-[10px] uppercase tracking-widest mb-1 flex items-center gap-1 ${activeFilter === "fit" ? "text-indigo-100" : "text-slate-500"}`}>
+                      High Fit Leads <HelpCircle size={10} />
+                    </p>
+                    <h3 className={`text-2xl font-bold ${activeFilter === "fit" ? "text-white" : "text-emerald-400"}`}>
+                      {threads.filter(t => t.semantic_similarity > 0.5).length}
+                    </h3>
+                  </div>
+                  <CheckCircle2 size={24} className={activeFilter === "fit" ? "text-white/40" : "text-slate-700"} />
                 </div>
-                <CheckCircle2 size={32} className="text-slate-700" />
-              </div>
-              <div className="bg-slate-900 p-6 rounded-2xl border border-slate-800 flex items-center justify-between shadow-sm">
-                <div>
-                  <p className="text-xs text-slate-500 uppercase tracking-widest mb-1">Avg Product Fit</p>
-                  <h3 className="text-3xl font-bold text-indigo-400">
-                    {threads.length > 0 ? Math.round((threads.reduce((acc, t) => acc + t.semantic_similarity, 0) / threads.length) * 100) : 0}%
-                  </h3>
+              </Tooltip>
+
+              <Tooltip text="Highly relevant leads based on combined score. Click to filter.">
+                <div
+                  onClick={() => {
+                    const newVal = activeFilter === "score" ? "all" : "score";
+                    setActiveFilter(newVal);
+                    setSortBy("relevance");
+                  }}
+                  className={`p-5 rounded-2xl border transition-all cursor-pointer flex items-center justify-between shadow-sm ${activeFilter === "score" ? "bg-indigo-600 border-indigo-400 shadow-indigo-500/20" : "bg-slate-900 border-slate-800 hover:border-indigo-500/30"
+                    }`}
+                >
+                  <div>
+                    <p className={`text-[10px] uppercase tracking-widest mb-1 flex items-center gap-1 ${activeFilter === "score" ? "text-indigo-100" : "text-slate-500"}`}>
+                      High Score <HelpCircle size={10} />
+                    </p>
+                    <h3 className={`text-2xl font-bold ${activeFilter === "score" ? "text-white" : "text-indigo-400"}`}>
+                      {threads.filter(t => t.relevance_score > 15.0).length}
+                    </h3>
+                  </div>
+                  <Zap size={24} className={activeFilter === "score" ? "text-white/40" : "text-slate-700"} />
                 </div>
-                <Radar size={32} className="text-slate-700" />
-              </div>
+              </Tooltip>
+
+              <Tooltip text="Maximum problem intensity detected in the current set.">
+                <div className="bg-slate-900 p-5 rounded-2xl border border-slate-800 flex items-center justify-between shadow-sm">
+                  <div>
+                    <p className="text-[10px] text-slate-500 uppercase tracking-widest mb-1">Max Intensity</p>
+                    <h3 className="text-2xl font-bold text-white">
+                      {threads.length > 0 ? Math.max(...threads.map(t => t.community_score)).toFixed(1) : "0.0"}
+                    </h3>
+                  </div>
+                  <TrendingUp size={24} className="text-slate-700" />
+                </div>
+              </Tooltip>
+
+              <Tooltip text="Average product alignment quality across pipeline.">
+                <div className="bg-slate-900 p-5 rounded-2xl border border-slate-800 flex items-center justify-between shadow-sm">
+                  <div>
+                    <p className="text-[10px] text-slate-500 uppercase tracking-widest mb-1">Avg Fit</p>
+                    <h3 className="text-2xl font-bold text-white">
+                      {threads.length > 0 ? Math.round((threads.reduce((acc, t) => acc + t.semantic_similarity, 0) / threads.length) * 100) : 0}%
+                    </h3>
+                  </div>
+                  <Radar size={24} className="text-slate-700" />
+                </div>
+              </Tooltip>
             </div>
 
             {/* Threads List */}
@@ -673,8 +1151,19 @@ function App() {
 
               {loading ? (
                 <div className="h-64 flex items-center justify-center text-slate-500">Loading intelligence...</div>
+              ) : filteredThreads.length === 0 ? (
+                <div className="h-64 flex flex-col items-center justify-center text-slate-500 bg-slate-900/50 rounded-2xl border border-dashed border-slate-800">
+                  <Search className="mb-4 opacity-20" size={48} />
+                  <p className="text-lg font-medium">No results match this filter</p>
+                  <button
+                    onClick={() => setActiveFilter("all")}
+                    className="mt-4 text-indigo-400 hover:text-indigo-300 font-bold"
+                  >
+                    Clear all filters
+                  </button>
+                </div>
               ) : (
-                sortedThreads.map((thread) => {
+                filteredThreads.map((thread) => {
                   const isExpanded = expandedThread === thread.id;
                   const signals = thread.signals_json ? JSON.parse(thread.signals_json) : null;
 
@@ -758,7 +1247,7 @@ function App() {
                                 <h5 className="text-xs font-bold text-slate-500 uppercase tracking-widest flex items-center gap-2">
                                   <FileText size={14} /> Full Thread Content
                                 </h5>
-                                <div className="text-sm text-slate-300 bg-slate-800/50 p-4 rounded-xl border border-slate-800 leading-relaxed max-h-64 overflow-y-auto">
+                                <div className="text-sm text-slate-300 bg-slate-800/50 p-4 rounded-xl border border-slate-800 leading-relaxed max-h-64 overflow-y-auto custom-scrollbar">
                                   {thread.body}
                                   <div className="mt-4 pt-4 border-t border-slate-800">
                                     <a href={thread.url} target="_blank" rel="noreferrer" className="text-indigo-400 hover:text-indigo-300 font-bold flex items-center gap-1">
@@ -766,6 +1255,58 @@ function App() {
                                     </a>
                                   </div>
                                 </div>
+
+                                <h5 className="text-xs font-bold text-slate-500 uppercase tracking-widest flex items-center gap-2 mt-8">
+                                  <Sparkles size={14} className="text-purple-500" /> Profile Intelligence
+                                </h5>
+                                {thread.generatedResponse ? (
+                                  <ResponseCard
+                                    response={thread.generatedResponse}
+                                    postUrl={thread.url}
+                                    postId={thread.id}
+                                    productId={selectedProduct}
+                                    loading={thread.isRegenerating}
+                                    error={thread.genError}
+                                    availableStyles={['empathetic', 'helpful_expert', 'casual', 'technical', 'brief']}
+                                    onRegenerate={(style) => {
+                                      const handleGen = async () => {
+                                        console.log(`[UI] Regenerating ${thread.id} with style ${style}`);
+                                        setThreads(prev => prev.map(t =>
+                                          t.id === thread.id ? { ...t, isRegenerating: true, genError: null } : t
+                                        ));
+
+                                        try {
+                                          const resp = await axios.post(`${API_BASE}/api/responses/generate/${thread.id}`, {
+                                            product_id: selectedProduct,
+                                            style: style
+                                          });
+                                          console.log(`[UI] Generation success for ${thread.id}`);
+                                          setThreads(prev => prev.map(t =>
+                                            t.id === thread.id ? { ...t, generatedResponse: resp.data, isRegenerating: false, genError: null } : t
+                                          ));
+                                        } catch (err) {
+                                          console.error(`[UI] Generation failed for ${thread.id}:`, err);
+                                          setThreads(prev => prev.map(t =>
+                                            t.id === thread.id ? { ...t, isRegenerating: false, genError: "Failed to generate. Try again." } : t
+                                          ));
+                                        }
+                                      };
+                                      handleGen();
+                                    }}
+                                  />
+                                ) : (
+                                  <GenerateResponseButton
+                                    postId={thread.id}
+                                    productId={selectedProduct}
+                                    defaultStyle={JSON.parse(thread.ai_analysis || '{}').urgency === 'High' ? 'empathetic' : 'helpful_expert'}
+                                    onGenerated={(res) => {
+                                      console.log(`[UI] Initial generation success for ${thread.id}`);
+                                      setThreads(prev => prev.map(t =>
+                                        t.id === thread.id ? { ...t, generatedResponse: res, isRegenerating: false, genError: null } : t
+                                      ));
+                                    }}
+                                  />
+                                )}
                               </div>
 
                               <div className="space-y-3">
@@ -788,8 +1329,8 @@ function App() {
                                             </div>
                                             <div className="flex flex-col items-end gap-2">
                                               <span className={`px-2 py-1 rounded-md text-[10px] font-black uppercase tracking-tighter ${ai.urgency === 'High' ? 'bg-red-500/20 text-red-400 border border-red-500/30' :
-                                                  ai.urgency === 'Medium' ? 'bg-orange-500/20 text-orange-400 border border-orange-500/30' :
-                                                    'bg-slate-700/50 text-slate-400'
+                                                ai.urgency === 'Medium' ? 'bg-orange-500/20 text-orange-400 border border-orange-500/30' :
+                                                  'bg-slate-700/50 text-slate-400'
                                                 }`}>
                                                 {ai.urgency} Urgency
                                               </span>
@@ -843,6 +1384,12 @@ function App() {
             onEdit={openEdit}
             onDelete={handleDeleteProduct}
             onCreate={openCreate}
+          />
+        )}
+        {showOnboarding && (
+          <OnboardingWizard
+            steps={discoverySteps}
+            onComplete={handleOnboardingComplete}
           />
         )}
       </main>

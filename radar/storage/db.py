@@ -108,6 +108,20 @@ def init_db():
     )
     """)
     
+    cursor.execute("""
+    CREATE TABLE IF NOT EXISTS generated_responses (
+        id TEXT PRIMARY KEY,
+        post_id TEXT NOT NULL,
+        product_id TEXT NOT NULL,
+        style TEXT NOT NULL DEFAULT 'empathetic',
+        response_text TEXT NOT NULL,
+        tokens_used INTEGER,
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        feedback TEXT,
+        FOREIGN KEY (post_id) REFERENCES posts(id) ON DELETE CASCADE,
+        FOREIGN KEY (product_id) REFERENCES products(id) ON DELETE CASCADE
+    )
+    """)
     conn.commit()
     
     # Migration: add new columns if missing
@@ -124,7 +138,14 @@ def init_db():
             conn.commit()
         except sqlite3.OperationalError:
             pass # Already exists
-        
+    # User Settings table (for onboarding, etc.)
+    cursor.execute("""
+    CREATE TABLE IF NOT EXISTS user_settings (
+        key TEXT PRIMARY KEY,
+        value TEXT
+    )
+    """)
+
     conn.close()
 
 def save_post(post_data: Dict[str, Any]):
@@ -193,6 +214,15 @@ def save_analysis(post_id: str, product_id: str, data: Dict[str, Any], cursor=No
         ))
         conn.commit()
         conn.close()
+
+def get_post(post_id: str):
+    conn = get_connection()
+    conn.row_factory = sqlite3.Row
+    cursor = conn.cursor()
+    cursor.execute("SELECT * FROM posts WHERE id = ?", (post_id,))
+    row = cursor.fetchone()
+    conn.close()
+    return dict(row) if row else None
 
 def get_analysis(post_id: str, product_id: str):
     conn = get_connection()
@@ -356,5 +386,59 @@ def delete_product(product_id: str):
     conn = get_connection()
     cursor = conn.cursor()
     cursor.execute("DELETE FROM products WHERE id = ?", (product_id,))
+    conn.commit()
+    conn.close()
+
+def save_generated_response(post_id: str, product_id: str, style: str, response_text: str, tokens_used: int):
+    import uuid
+    conn = get_connection()
+    cursor = conn.cursor()
+    response_id = str(uuid.uuid4())[:8]
+    cursor.execute("""
+        INSERT INTO generated_responses (id, post_id, product_id, style, response_text, tokens_used)
+        VALUES (?, ?, ?, ?, ?, ?)
+    """, (response_id, post_id, product_id, style, response_text, tokens_used))
+    conn.commit()
+    conn.close()
+    return response_id
+
+def get_generated_responses(post_id: str, product_id: str, limit: int = 5):
+    conn = get_connection()
+    conn.row_factory = sqlite3.Row
+    cursor = conn.cursor()
+    cursor.execute("""
+        SELECT * FROM generated_responses 
+        WHERE post_id = ? AND product_id = ? 
+        ORDER BY created_at DESC LIMIT ?
+    """, (post_id, product_id, limit))
+    rows = cursor.fetchall()
+    conn.close()
+    return [dict(row) for row in rows]
+
+def update_response_feedback(response_id: str, feedback: str):
+    conn = get_connection()
+    cursor = conn.cursor()
+    cursor.execute("UPDATE generated_responses SET feedback = ? WHERE id = ?", (feedback, response_id))
+    conn.commit()
+    conn.close()
+
+def get_user_setting(key: str, default: Any = None) -> Any:
+    conn = get_connection()
+    cursor = conn.cursor()
+    cursor.execute("SELECT value FROM user_settings WHERE key = ?", (key,))
+    row = cursor.fetchone()
+    conn.close()
+    if row:
+        try:
+            return json.loads(row[0])
+        except:
+            return row[0]
+    return default
+
+def save_user_setting(key: str, value: Any):
+    conn = get_connection()
+    cursor = conn.cursor()
+    val_str = json.dumps(value) if not isinstance(value, str) else value
+    cursor.execute("INSERT OR REPLACE INTO user_settings (key, value) VALUES (?, ?)", (key, val_str))
     conn.commit()
     conn.close()
