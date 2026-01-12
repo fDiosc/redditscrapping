@@ -5,38 +5,46 @@ from radar.products import PRODUCTS
 
 client = openai.OpenAI(api_key=OPENAI_API_KEY)
 
-def analyze_post_with_ai(post_data: Dict[str, Any], product_key: str) -> str:
-    product = PRODUCTS.get(product_key)
-    if not product:
-        return "Product not found in knowledge base."
-        
-    prompt = f"""
-    Analyze the following Reddit post and determine how it relates to the product "{product['name']}".
+def analyze_post_with_ai(unified_text: str, product_rec: Dict[str, Any]) -> str:
+    """Analyze a post with structured JSON output."""
+    name = product_rec['name']
+    description = product_rec['description']
     
-    Product Description: {product['description']}
-    Target Audience: {product['target_audience']}
-    Key Features: {', '.join(product['key_features'])}
+    system_prompt = """
+    You are a professional Market Research Analyst and Social Selling expert.
+    Your goal is to analyze a Reddit thread (Post + Comments) and determine if it represents a high-quality lead for a specific product.
     
-    Reddit Post Title: {post_data['title']}
-    Reddit Post Body: {post_data['body']}
+    You MUST respond with a valid JSON object only. No preamble, no markdown blocks.
+    Structure:
+    {
+        "pain_point_summary": "1-2 sentence summary of the core problem",
+        "pain_quote": "Exact short quote from the thread that confirms the struggle",
+        "urgency": "High/Medium/Low",
+        "product_relevance": 1-10 (Numeric),
+        "relevance_explanation": "Why this product helps this specific user",
+        "response_angle": "Suggested tone/angle for a response without being spammy",
+        "confidence": 0-1 (Numeric)
+    }
+    """
     
-    Please provide:
-    1. A brief assessment of the user's pain point.
-    2. How the product could potentially solve this specific problem.
-    3. A 'fit' rating from 1-10.
+    user_prompt = f"""
+    PRODUCT: {name}
+    DESCRIPTION: {description}
     
-    Keep the response concise and in Markdown format.
+    THREAD CONTENT:
+    {unified_text}
     """
     
     try:
         response = client.chat.completions.create(
             model="gpt-4o-mini",
             messages=[
-                {"role": "system", "content": "You are a product analyst helping a founder find leads and insights."},
-                {"role": "user", "content": prompt}
+                {"role": "system", "content": system_prompt},
+                {"role": "user", "content": user_prompt}
             ],
-            temperature=0.7
+            response_format={"type": "json_object"},
+            temperature=0
         )
         return response.choices[0].message.content
     except Exception as e:
-        return f"AI Analysis failed: {e}"
+        return json.dumps({"error": "AI Error", "details": str(e)})

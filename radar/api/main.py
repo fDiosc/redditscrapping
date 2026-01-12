@@ -23,9 +23,21 @@ app.add_middleware(
 
 @app.get("/config")
 async def get_config():
+    from radar.storage.db import get_products
+    products = get_products()
+    
+    # Extract unique subreddits from all products
+    all_subs = set()
+    for p in products:
+        try:
+            subs = json.loads(p['target_subreddits'])
+            all_subs.update(subs)
+        except:
+            pass
+            
     return {
-        "products": list(PRODUCTS.keys()),
-        "subreddits": list(SUBREDDITS.keys())
+        "products": [p['id'] for p in products],
+        "subreddits": sorted(list(all_subs))
     }
 
 @app.get("/threads")
@@ -34,13 +46,15 @@ async def get_threads(product: str = "profitdoctor", limit: int = 50):
     conn.row_factory = lambda cursor, row: dict(zip([col[0] for col in cursor.description], row))
     cursor = conn.cursor()
     
-    # We show threads ordered by relevance for the chosen product
+    # We show threads joined with their product-specific analysis
     cursor.execute("""
-        SELECT * FROM posts 
-        WHERE relevance_score > 0 
-        ORDER BY relevance_score DESC 
+        SELECT p.*, pa.relevance_score, pa.semantic_similarity, pa.community_score, pa.ai_analysis, pa.signals_json
+        FROM posts p
+        JOIN post_analysis pa ON p.id = pa.post_id
+        WHERE pa.product_id = ? AND pa.relevance_score > 0 
+        ORDER BY pa.relevance_score DESC 
         LIMIT ?
-    """, (limit,))
+    """, (product, limit))
     threads = cursor.fetchall()
     conn.close()
     return threads
@@ -57,67 +71,147 @@ SYNC_STATE = {
 async def get_sync_status():
     return SYNC_STATE
 
+@app.get("/threads/{post_id}/comments")
+async def get_post_comments(post_id: str):
+    from radar.storage.db import get_comments
+    return get_comments(post_id)
+
+@app.get("/sync/history")
+async def get_sync_history_api(limit: int = 10):
+    from radar.storage.db import get_sync_history
+    return get_sync_history(limit)
+
 @app.post("/sync")
 async def sync_data(
     background_tasks: BackgroundTasks,
     subreddits: List[str] = Query(...),
     days: int = 3,
-    reports: List[str] = Query(["DIRECT_FIT"])
+    reports: List[str] = Query(["DIRECT_FIT"]),
+    product: Optional[str] = None
 ):
     """Trigger ingestion, processing, and selective report generation."""
+    print(f"DEBUG: [API] Received sync request. Product: {product}, Subs: {subreddits}, Days: {days}", flush=True)
     if SYNC_STATE["is_running"]:
+        print("DEBUG: [API] Rejecting sync - already in progress.", flush=True)
         return {"error": "Sync already in progress", "status": SYNC_STATE}
 
-    from radar.storage.db import init_db
+    from radar.storage.db import init_db, add_sync_run, update_sync_run_status
     from radar.ingest.reddit_scraper import RedditScraper
     from radar.cli import process as cli_process
     from radar.cli import report as cli_report
     from datetime import datetime
 
+    run_id = add_sync_run(product or "all", subreddits, days)
+
     def run_sync():
+        print("DEBUG: [Worker] Background sync started.", flush=True)
         try:
             # Ensure DB schema is up to date
             init_db()
+            import time
+            time.sleep(1)
             
             SYNC_STATE["is_running"] = True
             SYNC_STATE["progress"] = 0
+            update_sync_run_status(run_id, "Ingesting", 10)
             
             scraper_tool = RedditScraper()
             # 1. Ingest
             for i, sub in enumerate(subreddits):
+                print(f"DEBUG: [Worker] Ingesting r/{sub}...", flush=True)
                 SYNC_STATE["current_step"] = f"Ingesting r/{sub}..."
                 SYNC_STATE["progress"] = int((i / len(subreddits)) * 40)
                 scraper_tool.fetch_subreddit_posts(sub, limit=15, days=days)
+                import time
+                time.sleep(0.5)
             
             # 2. Process
+            print("DEBUG: [Worker] Starting processing/scoring.", flush=True)
             SYNC_STATE["current_step"] = "Analyzing and Scoring threads..."
             SYNC_STATE["progress"] = 60
-            cli_process()
+            update_sync_run_status(run_id, "Processing", 60)
+            import time
+            time.sleep(1)
+            cli_process(ai_analyze=True, target_product=product, subreddit_filter=subreddits)
 
             # 3. Generate Selected Reports
-            SYNC_STATE["current_step"] = "Generating reports..."
+            print(f"DEBUG: [Worker] Generating reports for {product or 'all'}...", flush=True)
+            SYNC_STATE["current_step"] = f"Generating reports for {product or 'all products'}..."
             SYNC_STATE["progress"] = 80
+            update_sync_run_status(run_id, "Reporting", 80)
+            import time
+            time.sleep(1)
+            
+            from radar.storage.db import get_products
+            all_db_products = get_products()
+            target_products = [product] if product else [p['id'] for p in all_db_products]
+            
             for report_type in reports:
-                for product in PRODUCTS.keys():
+                for p_key in target_products:
                     try:
-                        cli_report(product, mode=report_type)
-                    except:
-                        pass
+                        cli_report(p_key, mode=report_type)
+                    except Exception as re:
+                        print(f"DEBUG: [Worker] Report error for {p_key}: {re}", flush=True)
             
             SYNC_STATE["last_sync"] = datetime.now().isoformat()
             SYNC_STATE["current_step"] = "Success"
             SYNC_STATE["progress"] = 100
+            update_sync_run_status(run_id, "Success", 100)
+            print("DEBUG: [Worker] Sync completed successfully.", flush=True)
         except Exception as e:
+            print(f"DEBUG: [Worker] Sync failed with error: {e}", flush=True)
             SYNC_STATE["current_step"] = f"Error: {str(e)}"
+            update_sync_run_status(run_id, f"Error: {str(e)[:50]}", SYNC_STATE["progress"])
         finally:
             # Keep the 100% or error message for a few seconds if polled, 
             # but we allow new syncs after a reset or in the next call
             import time
             time.sleep(2) 
             SYNC_STATE["is_running"] = False
+            print("DEBUG: [Worker] Sync background task finalized.", flush=True)
 
     background_tasks.add_task(run_sync)
     return {"status": "Sync and Report generation started"}
+
+@app.get("/api/products")
+async def list_products_api():
+    from radar.storage.db import get_products
+    return get_products()
+
+@app.get("/api/products/{product_id}")
+async def get_product_api(product_id: str):
+    from radar.storage.db import get_product
+    product = get_product(product_id)
+    if not product:
+        return {"error": "Product not found"}
+    return product
+
+@app.post("/api/products")
+async def create_product_api(product_data: dict):
+    from radar.services.product_service import upsert_product
+    # Generate ID from name if not provided
+    if 'id' not in product_data:
+        product_data['id'] = product_data['name'].lower().replace(" ", "")
+    
+    upsert_product(product_data)
+    return {"id": product_data['id'], "status": "saved"}
+
+@app.put("/api/products/{product_id}")
+async def update_product_api(product_id: str, product_data: dict):
+    from radar.services.product_service import upsert_product, get_product
+    existing = get_product(product_id)
+    if not existing:
+        return {"error": "Product not found"}
+    
+    product_data['id'] = product_id
+    upsert_product(product_data)
+    return {"id": product_id, "status": "updated"}
+
+@app.delete("/api/products/{product_id}")
+async def delete_product_api(product_id: str):
+    from radar.storage.db import delete_product
+    delete_product(product_id)
+    return {"status": "deleted"}
 
 @app.get("/reports/download/{filename}")
 async def download_report(filename: str):

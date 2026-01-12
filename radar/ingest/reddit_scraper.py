@@ -13,9 +13,14 @@ class RedditScraper:
 
     def fetch_subreddit_posts(self, subreddit_name: str, days: int = 7, limit: int = 20):
         url = f"https://old.reddit.com/r/{subreddit_name}/new/"
-        response = requests.get(url, headers=self.headers)
+        try:
+            response = requests.get(url, headers=self.headers, timeout=10)
+        except Exception as e:
+            print(f"DEBUG: Scraper error for r/{subreddit_name}: {e}", flush=True)
+            return 0
         
         if response.status_code != 200:
+            print(f"DEBUG: Scraper received {response.status_code} for r/{subreddit_name}", flush=True)
             return 0
             
         soup = BeautifulSoup(response.text, 'html.parser')
@@ -26,8 +31,6 @@ class RedditScraper:
             post_id = item.get('data-fullname')
             title = item.find('a', class_='title').text
             url = item.find('a', class_='title')['href']
-            # Old reddit usually doesn't show full body in list view easily without more scraping
-            # This is a simplified fallback
             
             # Deep scrape to get the body
             body = ""
@@ -36,14 +39,52 @@ class RedditScraper:
             
             if "/comments/" in full_url:
                 try:
-                    detail_res = requests.get(scrape_url, headers=self.headers)
+                    # print(f"DEBUG: Scraping detail page: {scrape_url}", flush=True)
+                    detail_res = requests.get(scrape_url, headers=self.headers, timeout=10)
                     if detail_res.status_code == 200:
                         detail_soup = BeautifulSoup(detail_res.text, 'html.parser')
                         body_div = detail_soup.find('div', class_='expando')
                         if body_div:
                             body = body_div.text.strip()
-                except:
-                    pass
+                            
+                        # Scrape all available comments - MOVED OUTSIDE body_div check
+                        from radar.storage.db import save_comment
+                        comment_items = detail_soup.select('div.comment')
+                        for c_item in comment_items:
+                            try:
+                                c_id = c_item.get('data-fullname')
+                                if not c_id: continue
+                                
+                                c_author = c_item.get('data-author')
+                                c_content_div = c_item.select_one('div.md')
+                                c_body = c_content_div.text.strip() if c_content_div else ""
+                                
+                                # Skip very short or empty comments
+                                if len(c_body) < 5: continue
+                                
+                                c_score_attr = c_item.find('span', class_='score unvoted')
+                                c_score = 0
+                                if c_score_attr:
+                                    c_score_text = c_score_attr.get('title', '0')
+                                    try:
+                                        c_score = int(c_score_text)
+                                    except:
+                                        c_score = 0
+                                
+                                save_comment({
+                                    'id': c_id,
+                                    'post_id': post_id,
+                                    'author': c_author,
+                                    'body': c_body,
+                                    'score': c_score,
+                                    'created_at': datetime.utcnow().isoformat(),
+                                    'depth': 0
+                                })
+                            except Exception as ce:
+                                # print(f"DEBUG: Error saving comment: {ce}", flush=True)
+                                pass
+                except Exception as e:
+                    print(f"DEBUG: Detail scrape failed: {e}", flush=True)
 
             post_data = {
                 'id': post_id,
@@ -60,6 +101,7 @@ class RedditScraper:
             }
             save_post(post_data)
             posts_count += 1
-            time.sleep(random.uniform(1, 3)) # Anti-block
+            print(f"DEBUG: [{subreddit_name}] Scraped: {title[:30]}...", flush=True)
+            time.sleep(random.uniform(0.5, 1.5)) # Slightly faster for testing
             
         return posts_count

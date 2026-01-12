@@ -38,3 +38,6 @@ outputs/reports/
 *.md
 !README.md
 !scrapping.md
+!architecture.md
+!phasefinal.md
+!outputs/reports/

@@ -2,7 +2,7 @@ from typing import List, Dict, Any
 import json
 from radar.config import INTENT_SIGNALS, PRODUCT_SIGNALS
 
-def detect_signals(text: str) -> Dict[str, Any]:
+def detect_signals(text: str, available_products: List[Dict[str, Any]] = None) -> Dict[str, Any]:
     text_lower = text.lower()
     detected_intents = []
     
@@ -13,15 +13,35 @@ def detect_signals(text: str) -> Dict[str, Any]:
     
     # Check product-specific pain points
     product_matches = {}
-    for product, signals in PRODUCT_SIGNALS.items():
-        matched_pain = [kw for kw in signals['pain'] if kw in text_lower]
-        matched_intent = [kw for kw in signals['intent'] if kw in text_lower]
-        
-        if matched_pain or matched_intent:
-            product_matches[product] = {
-                "pain_points": matched_pain,
-                "intents": matched_intent
-            }
+    
+    # Use provided products or fall back to static config (for safety during migration)
+    if available_products:
+        for p in available_products:
+            p_id = p['id']
+            try:
+                pain_kws = json.loads(p['pain_signals']) if isinstance(p['pain_signals'], str) else p['pain_signals']
+                intent_kws = json.loads(p['intent_signals']) if isinstance(p['intent_signals'], str) else p['intent_signals']
+                
+                matched_pain = [kw for kw in pain_kws if kw in text_lower]
+                matched_intent = [kw for kw in intent_kws if kw in text_lower]
+                
+                if matched_pain or matched_intent:
+                    product_matches[p_id] = {
+                        "pain_points": matched_pain,
+                        "intents": matched_intent
+                    }
+            except:
+                pass
+    else:
+        for product, signals in PRODUCT_SIGNALS.items():
+            matched_pain = [kw for kw in signals['pain'] if kw in text_lower]
+            matched_intent = [kw for kw in signals['intent'] if kw in text_lower]
+            
+            if matched_pain or matched_intent:
+                product_matches[product] = {
+                    "pain_points": matched_pain,
+                    "intents": matched_intent
+                }
             
     return {
         "intents": detected_intents,

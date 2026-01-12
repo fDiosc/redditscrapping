@@ -1,9 +1,16 @@
 import sqlite3
+import json
 from typing import List, Dict, Any, Optional
 from radar.config import DATABASE_PATH
 
 def get_connection():
-    return sqlite3.connect(DATABASE_PATH)
+    conn = sqlite3.connect(DATABASE_PATH, timeout=30)
+    # Enable Write-Ahead Logging for better concurrency
+    try:
+        conn.execute("PRAGMA journal_mode=WAL")
+    except:
+        pass
+    return conn
 
 def init_db():
     from radar.config import DATABASE_PATH
@@ -54,6 +61,50 @@ def init_db():
         pain_signals TEXT,
         is_solution BOOLEAN DEFAULT FALSE,
         FOREIGN KEY (post_id) REFERENCES posts(id)
+    )
+    """)
+    
+    # Post Analysis table (per-product)
+    cursor.execute("""
+    CREATE TABLE IF NOT EXISTS post_analysis (
+        post_id TEXT,
+        product_id TEXT,
+        relevance_score REAL DEFAULT 0,
+        semantic_similarity REAL DEFAULT 0,
+        community_score REAL DEFAULT 0,
+        ai_analysis TEXT,
+        signals_json TEXT,
+        PRIMARY KEY (post_id, product_id),
+        FOREIGN KEY (post_id) REFERENCES posts(id)
+    )
+    """)
+
+    # Products table (Dynamic configuration)
+    cursor.execute("""
+    CREATE TABLE IF NOT EXISTS products (
+        id TEXT PRIMARY KEY,
+        name TEXT NOT NULL,
+        description TEXT NOT NULL,
+        pain_signals TEXT NOT NULL,
+        intent_signals TEXT NOT NULL,
+        target_subreddits TEXT NOT NULL,
+        embedding_context TEXT,
+        embedding_id TEXT,
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+    )
+    """)
+
+    # Sync runs history
+    cursor.execute("""
+    CREATE TABLE IF NOT EXISTS sync_runs (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        timestamp TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        product TEXT,
+        subreddits TEXT,
+        days INTEGER,
+        status TEXT,
+        progress INTEGER DEFAULT 0
     )
     """)
     
@@ -115,21 +166,195 @@ def save_comment(comment_data: Dict[str, Any]):
     conn.commit()
     conn.close()
 
-def get_unprocessed_posts():
+def save_analysis(post_id: str, product_id: str, data: Dict[str, Any], cursor=None):
+    if cursor:
+        cursor.execute("""
+        INSERT OR REPLACE INTO post_analysis (
+            post_id, product_id, relevance_score, semantic_similarity, 
+            community_score, ai_analysis, signals_json
+        ) VALUES (?, ?, ?, ?, ?, ?, ?)
+        """, (
+            post_id, product_id, data.get('relevance_score', 0),
+            data.get('semantic_similarity', 0), data.get('community_score', 0),
+            data.get('ai_analysis'), data.get('signals_json')
+        ))
+    else:
+        conn = get_connection()
+        cur = conn.cursor()
+        cur.execute("""
+        INSERT OR REPLACE INTO post_analysis (
+            post_id, product_id, relevance_score, semantic_similarity, 
+            community_score, ai_analysis, signals_json
+        ) VALUES (?, ?, ?, ?, ?, ?, ?)
+        """, (
+            post_id, product_id, data.get('relevance_score', 0),
+            data.get('semantic_similarity', 0), data.get('community_score', 0),
+            data.get('ai_analysis'), data.get('signals_json')
+        ))
+        conn.commit()
+        conn.close()
+
+def get_analysis(post_id: str, product_id: str):
     conn = get_connection()
     conn.row_factory = sqlite3.Row
     cursor = conn.cursor()
-    try:
-        cursor.execute("""
+    cursor.execute("SELECT * FROM post_analysis WHERE post_id = ? AND product_id = ?", (post_id, product_id))
+    row = cursor.fetchone()
+    conn.close()
+    return dict(row) if row else None
+
+def get_unprocessed_posts(subreddit_filter: List[str] = None, limit: int = None, force: bool = False):
+    conn = get_connection()
+    conn.row_factory = sqlite3.Row
+    cursor = conn.cursor()
+    
+    if force:
+        query = "SELECT * FROM posts"
+    else:
+        query = """
             SELECT * FROM posts 
-            WHERE embedding_id IS NULL 
+            WHERE (embedding_id IS NULL 
             OR score != last_processed_score 
-            OR num_comments != last_processed_comments
-        """)
+            OR num_comments != last_processed_comments)
+        """
+    
+    params = []
+    
+    # Subreddit filter
+    if subreddit_filter:
+        placeholders = ', '.join(['?'] * len(subreddit_filter))
+        if "WHERE" in query:
+            query += f" AND source IN ({placeholders})"
+        else:
+            query += f" WHERE source IN ({placeholders})"
+        params.extend(subreddit_filter)
+        
+    # Limit
+    if limit:
+        query += " LIMIT ?"
+        params.append(limit)
+        
+    try:
+        cursor.execute(query, params)
     except sqlite3.OperationalError:
         # Fallback if columns don't exist yet
-        cursor.execute("SELECT * FROM posts WHERE embedding_id IS NULL")
+        fallback_query = "SELECT * FROM posts WHERE embedding_id IS NULL"
+        if force: fallback_query = "SELECT * FROM posts"
+        
+        if subreddit_filter:
+            placeholders = ', '.join(['?'] * len(subreddit_filter))
+            fallback_query += f" AND source IN ({placeholders})"
+            if limit:
+                fallback_query += " LIMIT ?"
+                cursor.execute(fallback_query, params)
+            else:
+                cursor.execute(fallback_query, params)
+        else:
+            if limit:
+                fallback_query += " LIMIT ?"
+                cursor.execute(fallback_query, (limit,))
+            else:
+                cursor.execute(fallback_query)
     
+    rows = cursor.fetchall()
+    conn.commit()
+    conn.close()
+    return [dict(row) for row in rows]
+
+def add_sync_run(product: str, subreddits: List[str], days: int):
+    conn = get_connection()
+    cursor = conn.cursor()
+    cursor.execute("""
+        INSERT INTO sync_runs (product, subreddits, days, status, progress)
+        VALUES (?, ?, ?, 'Running', 0)
+    """, (product, ', '.join(subreddits), days))
+    run_id = cursor.lastrowid
+    conn.commit()
+    conn.close()
+    return run_id
+
+def update_sync_run_status(run_id: int, status: str, progress: int):
+    conn = get_connection()
+    cursor = conn.cursor()
+    cursor.execute("UPDATE sync_runs SET status = ?, progress = ? WHERE id = ?", (status, progress, run_id))
+    conn.commit()
+    conn.close()
+
+def get_comments(post_id: str):
+    conn = get_connection()
+    conn.row_factory = sqlite3.Row
+    cursor = conn.cursor()
+    cursor.execute("SELECT * FROM comments WHERE post_id = ? ORDER BY score DESC", (post_id,))
     rows = cursor.fetchall()
     conn.close()
     return [dict(row) for row in rows]
+
+def get_sync_history(limit: int = 10):
+    conn = get_connection()
+    conn.row_factory = sqlite3.Row
+    cursor = conn.cursor()
+    cursor.execute("SELECT * FROM sync_runs ORDER BY timestamp DESC LIMIT ?", (limit,))
+    rows = cursor.fetchall()
+    conn.close()
+    return [dict(row) for row in rows]
+
+def get_products() -> List[Dict[str, Any]]:
+    conn = get_connection()
+    conn.row_factory = sqlite3.Row
+    cursor = conn.cursor()
+    cursor.execute("SELECT * FROM products ORDER BY name ASC")
+    rows = cursor.fetchall()
+    conn.close()
+    return [dict(row) for row in rows]
+
+def get_product(product_id: str) -> Optional[Dict[str, Any]]:
+    conn = get_connection()
+    conn.row_factory = sqlite3.Row
+    cursor = conn.cursor()
+    cursor.execute("SELECT * FROM products WHERE id = ?", (product_id,))
+    row = cursor.fetchone()
+    conn.close()
+    return dict(row) if row else None
+
+def save_product_record(product_data: Dict[str, Any]):
+    conn = get_connection()
+    cursor = conn.cursor()
+    
+    # Handle array types by converting to JSON strings if they aren't already strings
+    pain_signals = product_data['pain_signals']
+    if not isinstance(pain_signals, str):
+        pain_signals = json.dumps(pain_signals)
+        
+    intent_signals = product_data['intent_signals']
+    if not isinstance(intent_signals, str):
+        intent_signals = json.dumps(intent_signals)
+        
+    target_subreddits = product_data['target_subreddits']
+    if not isinstance(target_subreddits, str):
+        target_subreddits = json.dumps(target_subreddits)
+
+    cursor.execute("""
+    INSERT OR REPLACE INTO products (
+        id, name, description, pain_signals, intent_signals, 
+        target_subreddits, embedding_context, embedding_id, updated_at
+    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP)
+    """, (
+        product_data['id'],
+        product_data['name'],
+        product_data['description'],
+        pain_signals,
+        intent_signals,
+        target_subreddits,
+        product_data.get('embedding_context'),
+        product_data.get('embedding_id')
+    ))
+    
+    conn.commit()
+    conn.close()
+
+def delete_product(product_id: str):
+    conn = get_connection()
+    cursor = conn.cursor()
+    cursor.execute("DELETE FROM products WHERE id = ?", (product_id,))
+    conn.commit()
+    conn.close()
