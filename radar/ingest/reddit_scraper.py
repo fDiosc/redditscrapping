@@ -154,9 +154,13 @@ class RedditScraper:
         """Fetch posts from a subreddit with anti-ban protections."""
         url = f"https://old.reddit.com/r/{subreddit_name}/new/"
         
+        # Apply delay before initial request
+        self._smart_delay()
         response = self._request_with_retry(url)
+
         if not response or response.status_code != 200:
-            print(f"DEBUG: Failed to fetch r/{subreddit_name}", flush=True)
+            status_code = response.status_code if response else "NO_RESPONSE"
+            print(f"DEBUG: Failed to fetch r/{subreddit_name} (Status: {status_code})", flush=True)
             return 0
             
         soup = BeautifulSoup(response.text, 'html.parser')
