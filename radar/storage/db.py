@@ -1,9 +1,15 @@
 import sqlite3
 import json
+import os
 from typing import List, Dict, Any, Optional
 from radar.config import DATABASE_PATH
 
 def get_connection():
+    # Ensure directory exists
+    db_dir = os.path.dirname(DATABASE_PATH)
+    if db_dir and not os.path.exists(db_dir):
+        os.makedirs(db_dir, exist_ok=True)
+    
     conn = sqlite3.connect(DATABASE_PATH, timeout=30)
     # Enable Write-Ahead Logging for better concurrency
     try:
