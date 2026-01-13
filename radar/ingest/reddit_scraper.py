@@ -5,9 +5,9 @@ Reddit Scraper with Anti-Ban Phase 1 MVP
 - Rate limiting with jitter
 - Exponential backoff
 - Retry handler
+- JSON endpoint support for www.reddit.com
 """
 import requests
-from bs4 import BeautifulSoup
 from datetime import datetime
 import time
 import random
@@ -27,7 +27,7 @@ USER_AGENTS = [
 
 
 class RedditScraper:
-    """Scraper with anti-ban protections for Reddit."""
+    """Scraper with anti-ban protections for Reddit using JSON fallback."""
     
     def __init__(self):
         # Rate limiting config
@@ -52,20 +52,10 @@ class RedditScraper:
         }
     
     def _get_headers(self) -> dict:
-        """Generate browser-like headers with random User-Agent."""
+        """Generate headers compatible with JSON endpoint."""
         return {
             "User-Agent": random.choice(USER_AGENTS),
-            "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,*/*;q=0.8",
-            "Accept-Language": "en-US,en;q=0.9",
-            "Accept-Encoding": "gzip, deflate",
-            "DNT": "1",
-            "Connection": "keep-alive",
-            "Upgrade-Insecure-Requests": "1",
-            "Sec-Fetch-Dest": "document",
-            "Sec-Fetch-Mode": "navigate",
-            "Sec-Fetch-Site": "none",
-            "Sec-Fetch-User": "?1",
-            "Cache-Control": "max-age=0",
+            "Accept": "application/json",
         }
     
     def _smart_delay(self):
@@ -94,7 +84,6 @@ class RedditScraper:
             try:
                 self.stats["requests"] += 1
                 headers = self._get_headers()
-                
                 response = requests.get(url, headers=headers, timeout=15)
                 
                 # Handle rate limiting
@@ -151,8 +140,8 @@ class RedditScraper:
         return delay
     
     def fetch_subreddit_posts(self, subreddit_name: str, days: int = 7, limit: int = 20):
-        """Fetch posts from a subreddit with anti-ban protections."""
-        url = f"https://old.reddit.com/r/{subreddit_name}/new/"
+        """Fetch posts from a subreddit using JSON endpoint with anti-ban protections."""
+        url = f"https://www.reddit.com/r/{subreddit_name}/new/.json?limit={limit}"
         
         # Apply delay before initial request
         self._smart_delay()
@@ -163,24 +152,28 @@ class RedditScraper:
             print(f"DEBUG: Failed to fetch r/{subreddit_name} (Status: {status_code})", flush=True)
             return 0
             
-        soup = BeautifulSoup(response.text, 'html.parser')
-        items = soup.find_all('div', class_='thing')
+        try:
+            data = response.json()
+            items = data.get('data', {}).get('children', [])
+        except Exception as e:
+            print(f"DEBUG: Failed to parse JSON for r/{subreddit_name}: {e}", flush=True)
+            return 0
         
         posts_count = 0
-        for item in items[:limit]:
-            post_id = item.get('data-fullname')
-            title_elem = item.find('a', class_='title')
-            if not title_elem:
+        for item_wrapper in items:
+            item = item_wrapper.get('data', {})
+            post_id = item.get('name') # e.g., t3_...
+            if not post_id:
                 continue
                 
-            title = title_elem.text
-            url = title_elem['href']
+            title = item.get('title')
+            permalink = item.get('permalink')
+            full_url = f"https://www.reddit.com{permalink}"
             
             # CHECK: If already indexed with content, skip deep scrape
             existing = get_post(post_id)
-            score = int(item.get('data-score', 0))
-            num_comments = int(item.get('data-comments-count', 0))
-            full_url = f"https://reddit.com{url}" if url.startswith('/') else url.replace("old.reddit.com", "reddit.com")
+            score = item.get('score', 0)
+            num_comments = item.get('num_comments', 0)
 
             if existing and existing.get('body'):
                 print(f"DEBUG: [{subreddit_name}] Skipping deep scrape for existing post: {title[:40]}...", flush=True)
@@ -189,24 +182,9 @@ class RedditScraper:
                 posts_count += 1
                 continue
 
-            # Deep scrape to get the body
-            body = ""
-            scrape_url = full_url.replace("reddit.com", "old.reddit.com")
+            # For JSON, the body IS in the 'selftext' field
+            body = item.get('selftext', "").strip()
             
-            if "/comments/" in full_url:
-                # Apply delay before detail page request
-                self._smart_delay()
-                
-                detail_res = self._request_with_retry(scrape_url)
-                if detail_res and detail_res.status_code == 200:
-                    detail_soup = BeautifulSoup(detail_res.text, 'html.parser')
-                    body_div = detail_soup.find('div', class_='expando')
-                    if body_div:
-                        body = body_div.text.strip()
-                        
-                    # Scrape comments
-                    self._scrape_comments(detail_soup, post_id)
-
             post_data = {
                 'id': post_id,
                 'platform': 'reddit',
@@ -214,64 +192,82 @@ class RedditScraper:
                 'url': full_url,
                 'title': title,
                 'body': body,
-                'author': item.get('data-author'),
+                'author': item.get('author'),
                 'score': score,
                 'num_comments': num_comments,
-                'created_at': datetime.utcnow().isoformat(),
+                'created_at': datetime.fromtimestamp(item.get('created_utc', time.time())).isoformat(),
                 'ingestion_method': 'scraper'
             }
             save_post(post_data)
-            posts_count += 1
-            print(f"DEBUG: [{subreddit_name}] Formally Scraped: {title[:40]}...", flush=True)
             
-            # Apply delay between posts
-            self._smart_delay()
+            # Fetch comments via .json
+            if num_comments > 0:
+                self._scrape_comments_json(post_id, subreddit_name)
+
+            posts_count += 1
+            print(f"DEBUG: [{subreddit_name}] Formally Scraped (JSON): {title[:40]}...", flush=True)
+            
+            if posts_count >= limit:
+                break
             
         print(f"DEBUG: Scraper stats - {self.stats}", flush=True)
         return posts_count
-    
-    def _scrape_comments(self, soup: BeautifulSoup, post_id: str):
-        """Scrape comments from a post detail page."""
-        comment_items = soup.select('div.comment')
-        comments_saved = 0
+
+    def _scrape_comments_json(self, post_id: str, subreddit_name: str):
+        """Scrape comments from a post using JSON endpoint."""
+        # Reddit post IDs for comments usually don't have the t3_ prefix in the URL
+        simple_id = post_id.split('_')[1] if '_' in post_id else post_id
+        url = f"https://www.reddit.com/r/{subreddit_name}/comments/{simple_id}/.json"
         
-        for c_item in comment_items:
-            try:
-                c_id = c_item.get('data-fullname')
-                if not c_id:
-                    continue
-                
-                c_author = c_item.get('data-author')
-                c_content_div = c_item.select_one('div.md')
-                c_body = c_content_div.text.strip() if c_content_div else ""
-                
-                # Skip very short or empty comments
-                if len(c_body) < 5:
-                    continue
-                
-                c_score_attr = c_item.find('span', class_='score unvoted')
-                c_score = 0
-                if c_score_attr:
-                    c_score_text = c_score_attr.get('title', '0')
-                    try:
-                        c_score = int(c_score_text)
-                    except:
-                        c_score = 0
-                
-                save_comment({
-                    'id': c_id,
-                    'post_id': post_id,
-                    'author': c_author,
-                    'body': c_body,
-                    'score': c_score,
-                    'created_at': datetime.utcnow().isoformat(),
-                    'depth': 0
-                })
-                comments_saved += 1
-            except Exception as ce:
-                pass
+        self._smart_delay()
+        response = self._request_with_retry(url)
         
-        return comments_saved
+        if not response or response.status_code != 200:
+            return 0
+            
+        try:
+            data = response.json()
+            if not isinstance(data, list) or len(data) < 2:
+                return 0
+                
+            comments_data = data[1].get('data', {}).get('children', [])
+            return self._parse_json_comments(comments_data, post_id)
+        except Exception as e:
+            print(f"DEBUG: Error parsing comments JSON: {e}", flush=True)
+            return 0
+
+    def _parse_json_comments(self, children: list, post_id: str, depth: int = 0) -> int:
+        """Recursively parse JSON comments."""
+        saved_count = 0
+        for child in children:
+            if child.get('kind') != 't1':
+                continue
+                
+            data = child.get('data', {})
+            c_id = data.get('name')
+            body = data.get('body', '').strip()
+            
+            if not c_id or len(body) < 5:
+                continue
+                
+            save_comment({
+                'id': c_id,
+                'post_id': post_id,
+                'author': data.get('author'),
+                'body': body,
+                'score': data.get('score', 0),
+                'created_at': datetime.fromtimestamp(data.get('created_utc', time.time())).isoformat(),
+                'depth': depth
+            })
+            saved_count += 1
+            
+            # Parse replies
+            replies = data.get('replies')
+            if replies and isinstance(replies, dict):
+                reply_children = replies.get('data', {}).get('children', [])
+                saved_count += self._parse_json_comments(reply_children, post_id, depth + 1)
+        
+        return saved_count
     
     def get_stats(self) -> dict:
         """Return scraping statistics."""
