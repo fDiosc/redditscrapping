@@ -807,7 +807,7 @@ function MainApp() {
     if (syncing) {
       interval = setInterval(async () => {
         try {
-          const res = await axios.get(`${API_BASE}/sync/status`);
+          const res = await axios.get(`${API_BASE}/api/sync/status`);
           setSyncStatus(res.data);
           if (!res.data.is_running) {
             setSyncing(false);
@@ -941,7 +941,7 @@ function MainApp() {
       const headers = await getAuthHeaders();
       const subParams = selectedSubs.map(s => `subreddits=${s}`).join('&');
       const repParams = selectedReports.map(r => `reports=${r}`).join('&');
-      const url = `${API_BASE}/sync?${subParams}&${repParams}&days=${days}&product=${selectedProduct}`;
+      const url = `${API_BASE}/api/sync?${subParams}&${repParams}&days=${days}&product=${selectedProduct}`;
       console.log("Calling POST:", url);
       const res = await axios.post(url, {}, { headers });
       console.log("Sync API Response:", res.data);
