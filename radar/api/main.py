@@ -23,13 +23,6 @@ async def startup_event():
     from radar.storage.db import init_db
     init_db()
     
-    # Check for placeholder values
-    placeholders = ["seu_client_id", "seu_client_secret"]
-    if os.getenv("REDDIT_CLIENT_ID") in placeholders or os.getenv("REDDIT_CLIENT_SECRET") in placeholders:
-        print("\n\n" + "!" * 50)
-        print("WARNING: REDDIT_CLIENT_ID or REDDIT_CLIENT_SECRET contains placeholder values!")
-        print("Please update your .env file with actual credentials.")
-        print("!" * 50 + "\n\n")
 
 # Enable CORS for the React frontend
 app.add_middleware(
@@ -145,13 +138,10 @@ async def sync_data(
     user_id: str = Depends(get_current_user),
     subreddits: List[str] = Query(...),
     days: int = 3,
-    reports: List[str] = Query(["DIRECT_FIT"]),
     product: Optional[str] = None
 ):
     """Trigger ingestion, processing, and selective report generation for a user."""
-    print(f"DEBUG: [API] Received sync request. User: {user_id}, Product: {product}, Subs: {subreddits}, Days: {days}", flush=True)
     if SYNC_STATE["is_running"]:
-        print("DEBUG: [API] Rejecting sync - already in progress.", flush=True)
         return {"error": "Sync already in progress", "status": SYNC_STATE}
 
     from radar.storage.db import init_db, add_sync_run, update_sync_run_status
@@ -163,12 +153,9 @@ async def sync_data(
     run_id = add_sync_run(user_id, product or "all", subreddits, days)
 
     def run_sync():
-        print("DEBUG: [Worker] Background sync started.", flush=True)
         try:
             # Ensure DB schema is up to date
             init_db()
-            import time
-            time.sleep(1)
             
             SYNC_STATE["progress"] = 0
             update_sync_run_status(run_id, "Ingesting", 10)
@@ -176,7 +163,6 @@ async def sync_data(
             scraper_tool = RedditScraper()
             # 1. Ingest
             for i, sub in enumerate(subreddits):
-                print(f"DEBUG: [Worker] Ingesting r/{sub}...", flush=True)
                 SYNC_STATE["current_step"] = f"Ingesting r/{sub}..."
                 SYNC_STATE["progress"] = int((i / len(subreddits)) * 40)
                 scraper_tool.fetch_subreddit_posts(sub, limit=15, days=days)
@@ -184,40 +170,16 @@ async def sync_data(
                 time.sleep(0.5)
             
             # 2. Process
-            print("DEBUG: [Worker] Starting processing/scoring.", flush=True)
             SYNC_STATE["current_step"] = "Analyzing and Scoring threads..."
             SYNC_STATE["progress"] = 60
             update_sync_run_status(run_id, "Processing", 60)
-            import time
-            time.sleep(1)
             cli_process(ai_analyze=True, target_product=product, subreddit_filter=subreddits, user_id=user_id)
 
-            # 3. Generate Selected Reports
-            print(f"DEBUG: [Worker] Generating reports for {product or 'all'}...", flush=True)
-            SYNC_STATE["current_step"] = f"Generating reports for {product or 'all products'}..."
-            SYNC_STATE["progress"] = 80
-            update_sync_run_status(run_id, "Reporting", 80)
-            import time
-            time.sleep(1)
-            
-            from radar.storage.db import get_products
-            all_db_products = get_products(user_id=user_id)
-            target_products = [product] if product else [p['id'] for p in all_db_products]
-            
-            for report_type in reports:
-                for p_key in target_products:
-                    try:
-                        cli_report(p_key, mode=report_type)
-                    except Exception as re:
-                        print(f"DEBUG: [Worker] Report error for {p_key}: {re}", flush=True)
-            
             SYNC_STATE["last_sync"] = datetime.now().isoformat()
             SYNC_STATE["current_step"] = "Success"
             SYNC_STATE["progress"] = 100
             update_sync_run_status(run_id, "Success", 100)
-            print("DEBUG: [Worker] Sync completed successfully.", flush=True)
         except Exception as e:
-            print(f"DEBUG: [Worker] Sync failed with error: {e}", flush=True)
             SYNC_STATE["current_step"] = f"Error: {str(e)}"
             update_sync_run_status(run_id, f"Error: {str(e)[:50]}", SYNC_STATE["progress"])
         finally:
@@ -226,7 +188,6 @@ async def sync_data(
             import time
             time.sleep(2) 
             SYNC_STATE["is_running"] = False
-            print("DEBUG: [Worker] Sync background task finalized.", flush=True)
 
     SYNC_STATE["is_running"] = True
     SYNC_STATE["progress"] = 0

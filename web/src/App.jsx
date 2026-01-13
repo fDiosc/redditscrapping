@@ -116,7 +116,7 @@ const CommentsSection = ({ postId }) => {
         const res = await axios.get(`${API_BASE}/api/threads/${postId}/comments`);
         setComments(res.data);
       } catch (err) {
-        console.error("Failed to fetch comments", err);
+
       } finally {
         setLoading(false);
       }
@@ -401,7 +401,7 @@ const GenerateResponseButton = ({ postId, productId, defaultStyle, onGenerated }
       }, { headers });
       onGenerated(resp.data);
     } catch (err) {
-      console.error(err);
+
     } finally {
       setLoading(false);
     }
@@ -476,7 +476,7 @@ const ResponseCard = ({ response, postUrl, onRegenerate, availableStyles, loadin
 
     try {
       await axios.post(`${API_BASE}/api/responses/${displayResponse.id}/feedback`, { feedback: val });
-    } catch (err) { console.error("Feedback failed", err); }
+    } catch (err) { }
   };
 
   const fetchHistory = async () => {
@@ -484,7 +484,7 @@ const ResponseCard = ({ response, postUrl, onRegenerate, availableStyles, loadin
       try {
         const res = await axios.get(`${API_BASE}/api/responses/history/${postId}?product_id=${productId}`);
         setHistory(res.data);
-      } catch (err) { console.error("History fetch failed", err); }
+      } catch (err) { }
     }
     setShowHistory(!showHistory);
   };
@@ -675,7 +675,6 @@ function MainApp() {
   const [selectedProduct, setSelectedProduct] = useState(null);
   const [activeFilter, setActiveFilter] = useState("all"); // all, priority, intensity, untriaged
   const [selectedSubs, setSelectedSubs] = useState([]);
-  const [selectedReports, setSelectedReports] = useState(["DIRECT_FIT", "INTENSITY"]);
   const [days, setDays] = useState(3);
   const [threads, setThreads] = useState([]);
   const [loading, setLoading] = useState(false);
@@ -708,7 +707,7 @@ function MainApp() {
         setSelectedProduct(res.data.products[0]);
       }
     } catch (err) {
-      console.error("Failed to fetch config", err);
+
     }
   };
 
@@ -718,7 +717,7 @@ function MainApp() {
       const res = await axios.get(`${API_BASE}/api/products`, { headers });
       setProducts(res.data);
     } catch (err) {
-      console.error("Failed to fetch products", err);
+
     }
   };
 
@@ -728,7 +727,7 @@ function MainApp() {
       const res = await axios.get(`${API_BASE}/api/sync/history`, { headers });
       setHistory(res.data);
     } catch (err) {
-      console.error("Failed to fetch history", err);
+
     }
   };
 
@@ -755,7 +754,7 @@ function MainApp() {
         });
       });
     } catch (err) {
-      console.error("Failed to fetch threads", err);
+
     }
     setLoading(false);
   };
@@ -771,7 +770,7 @@ function MainApp() {
           setShowOnboarding(true);
         }
       } catch (err) {
-        console.error("Failed to check onboarding", err);
+
       }
     };
     checkOnboarding();
@@ -790,7 +789,7 @@ function MainApp() {
           setSyncStatus(res.data);
         }
       } catch (err) {
-        console.error("Failed to check sync status:", err);
+
       }
     };
     checkSyncStatus();
@@ -818,7 +817,7 @@ function MainApp() {
             clearInterval(interval);
           }
         } catch (err) {
-          console.error("Polling error:", err);
+
         }
       }, 1000);
     }
@@ -853,7 +852,7 @@ function MainApp() {
         value: 'true'
       }, { headers });
     } catch (err) {
-      console.error("Failed to save onboarding status", err);
+
     }
   };
 
@@ -870,7 +869,7 @@ function MainApp() {
       fetchProducts();
       fetchConfig();
     } catch (err) {
-      console.error("Save failed", err);
+
       alert("Failed to save product");
     }
   };
@@ -884,7 +883,7 @@ function MainApp() {
         fetchConfig();
         if (selectedProduct === id) setSelectedProduct(products[0]?.id || "");
       } catch (err) {
-        console.error("Delete failed", err);
+
       }
     }
   };
@@ -925,13 +924,12 @@ function MainApp() {
         t.id === postId ? { ...t, triage_status: newStatus === 'null' ? null : newStatus } : t
       ));
     } catch (err) {
-      console.error("Triage update failed:", err);
+
       alert("Failed to save feedback.");
     }
   };
 
   const handleSync = async () => {
-    console.log("Sync triggered. Product:", selectedProduct, "Subs:", selectedSubs, "Reports:", selectedReports);
     if (selectedSubs.length === 0) {
       alert("Please select at least one subreddit.");
       return;
@@ -940,23 +938,14 @@ function MainApp() {
     try {
       const headers = await getAuthHeaders();
       const subParams = selectedSubs.map(s => `subreddits=${s}`).join('&');
-      const repParams = selectedReports.map(r => `reports=${r}`).join('&');
-      const url = `${API_BASE}/api/sync?${subParams}&${repParams}&days=${days}&product=${selectedProduct}`;
-      console.log("Calling POST:", url);
+      const url = `${API_BASE}/api/sync?${subParams}&days=${days}&product=${selectedProduct}`;
       const res = await axios.post(url, {}, { headers });
-      console.log("Sync API Response:", res.data);
     } catch (err) {
-      console.error("Sync Trigger Failed:", err);
       alert("Sync failed: " + (err.response?.data?.error || err.message));
       setSyncing(false);
     }
   };
 
-  const toggleReport = (type) => {
-    setSelectedReports(prev =>
-      prev.includes(type) ? prev.filter(t => t !== type) : [...prev, type]
-    );
-  };
 
   return (
     <>
@@ -1420,7 +1409,6 @@ function MainApp() {
                                         availableStyles={['empathetic', 'helpful_expert', 'casual', 'technical', 'brief']}
                                         onRegenerate={(style) => {
                                           const handleGen = async () => {
-                                            console.log(`[UI] Regenerating ${thread.id} with style ${style}`);
                                             setThreads(prev => prev.map(t =>
                                               t.id === thread.id ? { ...t, isRegenerating: true, genError: null } : t
                                             ));
@@ -1431,12 +1419,10 @@ function MainApp() {
                                                 product_id: selectedProduct,
                                                 style: style
                                               }, { headers });
-                                              console.log(`[UI] Generation success for ${thread.id}`);
                                               setThreads(prev => prev.map(t =>
                                                 t.id === thread.id ? { ...t, generatedResponse: resp.data, isRegenerating: false, genError: null } : t
                                               ));
                                             } catch (err) {
-                                              console.error(`[UI] Generation failed for ${thread.id}:`, err);
                                               setThreads(prev => prev.map(t =>
                                                 t.id === thread.id ? { ...t, isRegenerating: false, genError: "Failed to generate. Try again." } : t
                                               ));
@@ -1451,7 +1437,6 @@ function MainApp() {
                                         productId={selectedProduct}
                                         defaultStyle={JSON.parse(thread.ai_analysis || '{}').urgency === 'High' ? 'empathetic' : 'helpful_expert'}
                                         onGenerated={(res) => {
-                                          console.log(`[UI] Initial generation success for ${thread.id}`);
                                           setThreads(prev => prev.map(t =>
                                             t.id === thread.id ? { ...t, generatedResponse: res, isRegenerating: false, genError: null } : t
                                           ));
