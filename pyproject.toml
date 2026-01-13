@@ -16,7 +16,9 @@ dependencies = [
     "pandas",
     "numpy",
     "fastapi",
-    "uvicorn"
+    "uvicorn",
+    "python-jose[cryptography]",
+    "httpx"
 ]
 
 [tool.setuptools]
