@@ -16,6 +16,11 @@ Conecte-se via SSH e execute:
 ```bash
 sudo apt update && sudo apt upgrade -y
 sudo apt install -y python3-pip python3-venv nodejs npm git nginx
+
+# Upgrade Node.js (Vite requer v20+)
+sudo npm install -g n
+sudo n 22
+# Recarregue o shell ou abra uma nova sessão para aplicar a mudança de versão
 ```
 
 ## 3. Deploy do Código
