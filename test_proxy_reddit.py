@@ -1,10 +1,10 @@
 from curl_cffi import requests
 import json
 
-# Bright Data Residential Proxy Credentials from your screenshot
+# Bright Data ISP Proxy Credentials
 PROXY_HOST = "brd.superproxy.io:33335"
-PROXY_USER = "brd-customer-hl_06b63b6a-zone-residential_proxy1"
-PROXY_PASS = "rf06422hv83l"
+PROXY_USER = "brd-customer-hl_06b63b6a-zone-isp_proxy1"
+PROXY_PASS = "cmo92m30ucsg"
 
 # Constructing the proxy URL
 PROXY_URL = f"http://{PROXY_USER}:{PROXY_PASS}@{PROXY_HOST}"
