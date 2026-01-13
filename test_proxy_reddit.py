@@ -23,12 +23,14 @@ def test_reddit_proxy(subreddit):
     
     try:
         # Using impersonate="chrome110" + Residential Proxy
+        # verify=False is used because of the "self signed certificate" error with Bright Data/EC2
         response = requests.get(
             url, 
             impersonate="chrome110", 
             proxies=proxies,
             headers={"Accept": "application/json"},
-            timeout=30
+            timeout=30,
+            verify=False
         )
         
         print(f"Status Code: {response.status_code}")
