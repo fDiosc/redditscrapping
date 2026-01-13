@@ -113,7 +113,7 @@ const CommentsSection = ({ postId }) => {
   useEffect(() => {
     const fetchComments = async () => {
       try {
-        const res = await axios.get(`${API_BASE}/threads/${postId}/comments`);
+        const res = await axios.get(`${API_BASE}/api/threads/${postId}/comments`);
         setComments(res.data);
       } catch (err) {
         console.error("Failed to fetch comments", err);
@@ -702,7 +702,7 @@ function MainApp() {
   const fetchConfig = async () => {
     try {
       const headers = await getAuthHeaders();
-      const res = await axios.get(`${API_BASE}/config`, { headers });
+      const res = await axios.get(`${API_BASE}/api/config`, { headers });
       setConfig(res.data);
       if (res.data.products?.length > 0 && !res.data.products.includes(selectedProduct)) {
         setSelectedProduct(res.data.products[0]);
@@ -725,7 +725,7 @@ function MainApp() {
   const fetchHistory = async () => {
     try {
       const headers = await getAuthHeaders();
-      const res = await axios.get(`${API_BASE}/sync/history`, { headers });
+      const res = await axios.get(`${API_BASE}/api/sync/history`, { headers });
       setHistory(res.data);
     } catch (err) {
       console.error("Failed to fetch history", err);
@@ -736,7 +736,7 @@ function MainApp() {
     setLoading(true);
     try {
       const headers = await getAuthHeaders();
-      const res = await axios.get(`${API_BASE}/threads?product=${selectedProduct}`, { headers });
+      const res = await axios.get(`${API_BASE}/api/threads?product=${selectedProduct}`, { headers });
       setThreads(prev => {
         const regeneratingStates = prev.reduce((acc, t) => {
           if (t.isRegenerating) acc[t.id] = t;
@@ -784,7 +784,7 @@ function MainApp() {
     // Check if sync is already running (persists across page reloads)
     const checkSyncStatus = async () => {
       try {
-        const res = await axios.get(`${API_BASE}/sync/status`);
+        const res = await axios.get(`${API_BASE}/api/sync/status`);
         if (res.data.is_running) {
           setSyncing(true);
           setSyncStatus(res.data);
