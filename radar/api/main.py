@@ -17,6 +17,20 @@ from radar.cli import process as cli_process
 
 app = FastAPI(title="SonarPro AI API")
 
+# Initialize database on startup
+@app.on_event("startup")
+async def startup_event():
+    from radar.storage.db import init_db
+    init_db()
+    
+    # Check for placeholder values
+    placeholders = ["seu_client_id", "seu_client_secret"]
+    if os.getenv("REDDIT_CLIENT_ID") in placeholders or os.getenv("REDDIT_CLIENT_SECRET") in placeholders:
+        print("\n\n" + "!" * 50)
+        print("WARNING: REDDIT_CLIENT_ID or REDDIT_CLIENT_SECRET contains placeholder values!")
+        print("Please update your .env file with actual credentials.")
+        print("!" * 50 + "\n\n")
+
 # Enable CORS for the React frontend
 app.add_middleware(
     CORSMiddleware,
