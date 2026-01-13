@@ -10,8 +10,9 @@ REDDIT_USER_AGENT = os.getenv("REDDIT_USER_AGENT", "python:radar:v0.1.0")
 OPENAI_API_KEY = os.getenv("OPENAI_API_KEY")
 
 # Storage Configuration
-DATABASE_PATH = os.getenv("DATABASE_PATH", "data/radar.db")
-CHROMA_PATH = os.getenv("CHROMA_PATH", "data/chroma")
+PROJECT_ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+DATABASE_PATH = os.path.abspath(os.getenv("DATABASE_PATH", os.path.join(PROJECT_ROOT, "data/radar.db")))
+CHROMA_PATH = os.path.abspath(os.getenv("CHROMA_PATH", os.path.join(PROJECT_ROOT, "data/chroma")))
 
 # Target Subreddits
 SUBREDDITS = {
