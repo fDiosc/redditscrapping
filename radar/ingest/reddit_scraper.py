@@ -124,68 +124,101 @@ class RedditScraper:
         self.stats["failed"] += 1
         return None
     
-    def fetch_subreddit_posts(self, subreddit_name: str, days: int = 1, limit: int = 25):
-        """Fetch posts from a subreddit using JSON endpoint."""
-        url = f"https://www.reddit.com/r/{subreddit_name}/new/.json?limit={limit}"
-        
-        self._smart_delay()
-        data = self._request_with_retry(url)
-
-        if not data:
-            print(f"DEBUG: Failed to fetch r/{subreddit_name} (Status: NO_RESPONSE or error)", flush=True)
-            return 0
-            
-        try:
-            items = data.get('data', {}).get('children', [])
-        except Exception as e:
-            print(f"DEBUG: Failed to parse JSON for r/{subreddit_name}: {e}", flush=True)
-            return 0
-        
-        posts_count = 0
+    def fetch_subreddit_posts(self, subreddit_name: str, days: int = 1, limit: int = 100):
+        """
+        Fetch posts from a subreddit using JSON endpoint with pagination support.
+        Will continue fetching until it hits posts older than the 'days' cutoff or a total of 500 posts.
+        """
+        posts_added = 0
         cutoff = datetime.utcnow().timestamp() - (days * 86400)
+        after = None
+        max_total = 500 # Safety cap to avoid infinite loops or massive scraping
         
-        for item_wrapper in items:
-            item = item_wrapper.get('data', {})
-            post_id = item.get('name')
-            if not post_id or item.get('created_utc', 0) < cutoff:
-                continue
+        print(f"DEBUG: Starting deep sync for r/{subreddit_name} (Cutoff: {days} days)", flush=True)
+
+        while posts_added < max_total:
+            url = f"https://www.reddit.com/r/{subreddit_name}/new/.json?limit={limit}"
+            if after:
+                url += f"&after={after}"
+            
+            self._smart_delay()
+            data = self._request_with_retry(url)
+
+            if not data:
+                print(f"DEBUG: Failed to fetch next page for r/{subreddit_name}. Ending sync early.", flush=True)
+                break
                 
-            title = item.get('title')
-            full_url = f"https://www.reddit.com{item.get('permalink')}"
+            try:
+                items = data.get('data', {}).get('children', [])
+                current_after = data.get('data', {}).get('after')
+            except Exception as e:
+                print(f"DEBUG: Failed to parse JSON for r/{subreddit_name}: {e}", flush=True)
+                break
             
-            existing = get_post(post_id)
-            score = item.get('score', 0)
-            num_comments = item.get('num_comments', 0)
-
-            if existing and existing.get('body'):
-                update_post_stats(post_id, score, num_comments)
-                self.stats["skipped_deep"] += 1
-                posts_count += 1
-                continue
-
-            post_data = {
-                'id': post_id,
-                'platform': 'reddit',
-                'source': subreddit_name,
-                'url': full_url,
-                'title': title,
-                'body': item.get('selftext', "").strip(),
-                'author': item.get('author'),
-                'score': score,
-                'num_comments': num_comments,
-                'created_at': datetime.fromtimestamp(item.get('created_utc')).isoformat(),
-                'ingestion_method': 'scraper'
-            }
-            save_post(post_data)
+            if not items:
+                break
             
-            # Fetch comments
-            if num_comments > 0:
-                self._smart_delay()
-                self._scrape_comments_json(post_id, subreddit_name)
-
-            posts_count += 1
+            page_processed = 0
+            page_old_posts = 0
             
-        return posts_count
+            for item_wrapper in items:
+                item = item_wrapper.get('data', {})
+                post_id = item.get('name')
+                created_utc = item.get('created_utc', 0)
+                
+                if created_utc < cutoff:
+                    page_old_posts += 1
+                    continue
+                    
+                title = item.get('title')
+                full_url = f"https://www.reddit.com{item.get('permalink')}"
+                
+                existing = get_post(post_id)
+                score = item.get('score', 0)
+                num_comments = item.get('num_comments', 0)
+
+                if existing and existing.get('body'):
+                    update_post_stats(post_id, score, num_comments)
+                    self.stats["skipped_deep"] += 1
+                    posts_added += 1
+                    page_processed += 1
+                    continue
+
+                post_data = {
+                    'id': post_id,
+                    'platform': 'reddit',
+                    'source': subreddit_name,
+                    'url': full_url,
+                    'title': title,
+                    'body': item.get('selftext', "").strip(),
+                    'author': item.get('author'),
+                    'score': score,
+                    'num_comments': num_comments,
+                    'created_at': datetime.fromtimestamp(created_utc).isoformat(),
+                    'ingestion_method': 'scraper'
+                }
+                save_post(post_data)
+                
+                # Fetch comments
+                if num_comments > 0:
+                    self._smart_delay()
+                    self._scrape_comments_json(post_id, subreddit_name)
+
+                posts_added += 1
+                page_processed += 1
+            
+            print(f"DEBUG: [r/{subreddit_name}] Page processed: {page_processed} saved, {page_old_posts} beyond cutoff. Total: {posts_added}", flush=True)
+
+            # Termination conditions
+            if not current_after or page_old_posts > 0:
+                # If we found posts older than our cutoff, we can stop
+                if page_old_posts > 0:
+                    print(f"DEBUG: Hitting date cutoff for r/{subreddit_name}. Stopping.", flush=True)
+                break
+                
+            after = current_after
+            
+        return posts_added
 
     def _scrape_comments_json(self, post_id: str, subreddit_name: str):
         """Scrape comments from a post using JSON endpoint."""

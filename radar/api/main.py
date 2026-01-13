@@ -165,7 +165,8 @@ async def sync_data(
             for i, sub in enumerate(subreddits):
                 SYNC_STATE["current_step"] = f"Ingesting r/{sub}..."
                 SYNC_STATE["progress"] = int((i / len(subreddits)) * 40)
-                scraper_tool.fetch_subreddit_posts(sub, limit=15, days=days)
+                # Remove hardcoded limit to allow scraper's internal date-based logic and pagination
+                scraper_tool.fetch_subreddit_posts(sub, days=days)
                 import time
                 time.sleep(0.5)
             
