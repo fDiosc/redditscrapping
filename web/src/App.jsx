@@ -1028,521 +1028,523 @@ function MainApp() {
                 </section>
                 */}
 
-                <section>
-                  <label className="text-xs font-semibold uppercase tracking-wider text-slate-500 mb-2 block">Scraping Range (Days)</label>
-                  <input
-                    type="range" min="1" max="14" value={days}
-                    onChange={(e) => setDays(e.target.value)}
-                    className="w-full h-2 bg-slate-800 rounded-lg appearance-none cursor-pointer accent-indigo-500"
-                  />
-                  <div className="flex justify-between text-[10px] text-slate-500 mt-1">
-                    <span>1d</span>
-                    <span>7d</span>
-                    <span>14d</span>
-                  </div>
-                </section>
+                <div className="flex justify-between items-center mb-2">
+                  <label className="text-xs font-semibold uppercase tracking-wider text-slate-500 block">Scraping Range</label>
+                  <span className="text-[10px] font-bold text-indigo-400 bg-indigo-500/10 px-2 py-0.5 rounded border border-indigo-500/20">{days} {days === "1" || days === 1 ? 'Day' : 'Days'}</span>
+                </div>
+                <input
+                  type="range" min="1" max="14" value={days}
+                  onChange={(e) => setDays(e.target.value)}
+                  className="w-full h-2 bg-slate-800 rounded-lg appearance-none cursor-pointer accent-indigo-500"
+                />
+                <div className="flex justify-between text-[10px] text-slate-500 mt-1">
+                  <span>1d</span>
+                  <span>7d</span>
+                  <span>14d</span>
+                </div>
+              </section>
 
-                <div className="space-y-4">
-                  <button
-                    onClick={handleSync}
-                    disabled={syncing}
-                    className={`w-full font-bold py-4 rounded-xl flex items-center justify-center gap-3 shadow-lg transition-all active:scale-95 ${syncing
-                      ? 'bg-slate-700 text-slate-400 cursor-not-allowed border border-slate-600'
-                      : 'bg-indigo-600 hover:bg-indigo-500 text-white shadow-indigo-600/20'
-                      }`}
-                  >
-                    {syncing ? <RefreshCw className="animate-spin" /> : <Activity />}
-                    {syncing ? "Syncing..." : "Run Intelligence Sync"}
-                  </button>
+              <div className="space-y-4">
+                <button
+                  onClick={handleSync}
+                  disabled={syncing}
+                  className={`w-full font-bold py-4 rounded-xl flex items-center justify-center gap-3 shadow-lg transition-all active:scale-95 ${syncing
+                    ? 'bg-slate-700 text-slate-400 cursor-not-allowed border border-slate-600'
+                    : 'bg-indigo-600 hover:bg-indigo-500 text-white shadow-indigo-600/20'
+                    }`}
+                >
+                  {syncing ? <RefreshCw className="animate-spin" /> : <Activity />}
+                  {syncing ? "Syncing..." : "Run Intelligence Sync"}
+                </button>
 
-                  {syncing && (
-                    <div className="bg-slate-800/50 p-3 rounded-lg border border-slate-700/50 space-y-2 animate-in fade-in slide-in-from-bottom-2 duration-300">
-                      <div className="flex justify-between text-[10px] font-bold uppercase tracking-wider">
-                        <span className="text-indigo-400 flex items-center gap-2">
-                          <span className="relative flex h-2 w-2">
-                            <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-indigo-400 opacity-75"></span>
-                            <span className="relative inline-flex rounded-full h-2 w-2 bg-indigo-500"></span>
-                          </span>
-                          {syncStatus.current_step}
+                {syncing && (
+                  <div className="bg-slate-800/50 p-3 rounded-lg border border-slate-700/50 space-y-2 animate-in fade-in slide-in-from-bottom-2 duration-300">
+                    <div className="flex justify-between text-[10px] font-bold uppercase tracking-wider">
+                      <span className="text-indigo-400 flex items-center gap-2">
+                        <span className="relative flex h-2 w-2">
+                          <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-indigo-400 opacity-75"></span>
+                          <span className="relative inline-flex rounded-full h-2 w-2 bg-indigo-500"></span>
                         </span>
-                        <span className="text-slate-500">{syncStatus.progress}%</span>
-                      </div>
-                      <div className="w-full h-1 bg-slate-700 rounded-full overflow-hidden">
-                        <div
-                          className="h-full bg-gradient-to-r from-indigo-600 to-indigo-400 transition-all duration-500 ease-out"
-                          style={{ width: `${syncStatus.progress}%` }}
-                        ></div>
-                      </div>
+                        {syncStatus.current_step}
+                      </span>
+                      <span className="text-slate-500">{syncStatus.progress}%</span>
                     </div>
+                    <div className="w-full h-1 bg-slate-700 rounded-full overflow-hidden">
+                      <div
+                        className="h-full bg-gradient-to-r from-indigo-600 to-indigo-400 transition-all duration-500 ease-out"
+                        style={{ width: `${syncStatus.progress}%` }}
+                      ></div>
+                    </div>
+                  </div>
+                )}
+              </div>
+
+              <section className="border-t border-slate-800 pt-6">
+                <label className="text-xs font-semibold uppercase tracking-wider text-slate-500 mb-4 block flex items-center gap-2">
+                  <RefreshCw size={14} /> Run History
+                </label>
+                <div className="space-y-3 max-h-80 overflow-y-auto pr-2 custom-scrollbar">
+                  {history.length === 0 ? (
+                    <p className="text-[10px] text-slate-600 italic">No past runs recorded.</p>
+                  ) : (
+                    history.map(run => (
+                      <div key={run.id} className="bg-slate-800/30 border border-slate-800 p-3 rounded-xl hover:border-slate-600 transition-all cursor-pointer group active:scale-95">
+                        <div className="flex justify-between items-start mb-2">
+                          <span className="text-[10px] font-black text-indigo-400 truncate uppercase w-2/3 tracking-tighter">{run.product}</span>
+                          <span className="text-[9px] text-slate-500 font-mono">{new Date(run.timestamp).toLocaleDateString([], { month: 'short', day: 'numeric' })}</span>
+                        </div>
+                        <div className="flex justify-between items-center">
+                          <span className="text-[9px] text-slate-400 truncate w-1/2 font-medium">r/{run.subreddits}</span>
+                          <span className={`text-[8px] px-2 py-0.5 rounded-full font-black uppercase tracking-widest ${run.status === 'Success' ? 'bg-emerald-500/10 text-emerald-500' :
+                            run.status.startsWith('Error') ? 'bg-red-500/10 text-red-500' : 'bg-indigo-500/10 text-indigo-400'
+                            }`}>
+                            {run.status.split(':')[0]}
+                          </span>
+                        </div>
+                      </div>
+                    ))
                   )}
                 </div>
+              </section>
+            </div>
+        </div>
 
-                <section className="border-t border-slate-800 pt-6">
-                  <label className="text-xs font-semibold uppercase tracking-wider text-slate-500 mb-4 block flex items-center gap-2">
-                    <RefreshCw size={14} /> Run History
-                  </label>
-                  <div className="space-y-3 max-h-80 overflow-y-auto pr-2 custom-scrollbar">
-                    {history.length === 0 ? (
-                      <p className="text-[10px] text-slate-600 italic">No past runs recorded.</p>
-                    ) : (
-                      history.map(run => (
-                        <div key={run.id} className="bg-slate-800/30 border border-slate-800 p-3 rounded-xl hover:border-slate-600 transition-all cursor-pointer group active:scale-95">
-                          <div className="flex justify-between items-start mb-2">
-                            <span className="text-[10px] font-black text-indigo-400 truncate uppercase w-2/3 tracking-tighter">{run.product}</span>
-                            <span className="text-[9px] text-slate-500 font-mono">{new Date(run.timestamp).toLocaleDateString([], { month: 'short', day: 'numeric' })}</span>
+        <div className="p-6 border-t border-slate-800 bg-slate-900/50 flex items-center justify-between">
+          <div className="flex items-center gap-3 text-slate-500 hover:text-slate-300 transition-colors cursor-pointer">
+            <Settings size={18} />
+            <span className="text-sm">Settings</span>
+          </div>
+          <UserButton afterSignOutUrl="/" />
+        </div>
+      </aside>
+
+      {/* Main Content */}
+      <main className="flex-1 p-10 overflow-y-auto">
+        <ProductModal
+          isOpen={isModalOpen}
+          onClose={() => setIsModalOpen(false)}
+          onSave={handleSaveProduct}
+          product={editingProduct}
+        />
+
+        {view === "dashboard" ? (
+          <>
+            <header className="flex justify-between items-end mb-12">
+              <div>
+                <h2 className="text-4xl font-extrabold text-white mb-2">Discovery Dashboard</h2>
+                <p className="text-slate-400">Total high-relevance matches found: <span className="text-indigo-400 font-bold">{threads.length}</span></p>
+              </div>
+              <div className="flex gap-4">
+                <button onClick={fetchThreads} className="p-3 bg-slate-900 border border-slate-800 rounded-lg text-slate-400 hover:text-white transition-all">
+                  <RefreshCw size={20} className={loading ? 'animate-spin' : ''} />
+                </button>
+              </div>
+            </header>
+
+            {/* Stats Grid */}
+            <div className="grid grid-cols-5 gap-4 mb-12">
+              <Tooltip text="Measures the depth and frequency of problem discussion. Click to filter hot topics.">
+                <div
+                  onClick={() => {
+                    const newVal = activeFilter === "intensity" ? "all" : "intensity";
+                    setActiveFilter(newVal);
+                    setSortBy(newVal === "intensity" ? "intensity" : "relevance");
+                  }}
+                  className={`p-5 rounded-2xl border transition-all cursor-pointer flex items-center justify-between shadow-sm ${activeFilter === "intensity" ? "bg-indigo-600 border-indigo-400 shadow-indigo-500/20" : "bg-slate-900 border-slate-800 hover:border-indigo-500/30"
+                    }`}
+                >
+                  <div>
+                    <p className={`text-[10px] uppercase tracking-widest mb-1 flex items-center gap-1 ${activeFilter === "intensity" ? "text-indigo-100" : "text-slate-500"}`}>
+                      High Intensity <HelpCircle size={10} />
+                    </p>
+                    <h3 className={`text-2xl font-bold ${activeFilter === "intensity" ? "text-white" : "text-orange-400"}`}>
+                      {threads.filter(t => t.community_score > 3.0).length}
+                    </h3>
+                  </div>
+                  <BarChart3 size={24} className={activeFilter === "intensity" ? "text-white/40" : "text-slate-700"} />
+                </div>
+              </Tooltip>
+
+              <Tooltip text="Number of posts that directly match your product signals. Click to filter.">
+                <div
+                  onClick={() => {
+                    const newVal = activeFilter === "fit" ? "all" : "fit";
+                    setActiveFilter(newVal);
+                    setSortBy(newVal === "fit" ? "fit" : "relevance");
+                  }}
+                  className={`p-5 rounded-2xl border transition-all cursor-pointer flex items-center justify-between shadow-sm ${activeFilter === "fit" ? "bg-indigo-600 border-indigo-400 shadow-indigo-500/20" : "bg-slate-900 border-slate-800 hover:border-indigo-500/30"
+                    }`}
+                >
+                  <div>
+                    <p className={`text-[10px] uppercase tracking-widest mb-1 flex items-center gap-1 ${activeFilter === "fit" ? "text-indigo-100" : "text-slate-500"}`}>
+                      High Fit Leads <HelpCircle size={10} />
+                    </p>
+                    <h3 className={`text-2xl font-bold ${activeFilter === "fit" ? "text-white" : "text-emerald-400"}`}>
+                      {threads.filter(t => t.semantic_similarity > 0.5).length}
+                    </h3>
+                  </div>
+                  <CheckCircle2 size={24} className={activeFilter === "fit" ? "text-white/40" : "text-slate-700"} />
+                </div>
+              </Tooltip>
+
+              <Tooltip text="Highly relevant leads based on combined score. Click to filter.">
+                <div
+                  onClick={() => {
+                    const newVal = activeFilter === "score" ? "all" : "score";
+                    setActiveFilter(newVal);
+                    setSortBy("relevance");
+                  }}
+                  className={`p-5 rounded-2xl border transition-all cursor-pointer flex items-center justify-between shadow-sm ${activeFilter === "score" ? "bg-indigo-600 border-indigo-400 shadow-indigo-500/20" : "bg-slate-900 border-slate-800 hover:border-indigo-500/30"
+                    }`}
+                >
+                  <div>
+                    <p className={`text-[10px] uppercase tracking-widest mb-1 flex items-center gap-1 ${activeFilter === "score" ? "text-indigo-100" : "text-slate-500"}`}>
+                      High Score <HelpCircle size={10} />
+                    </p>
+                    <h3 className={`text-2xl font-bold ${activeFilter === "score" ? "text-white" : "text-indigo-400"}`}>
+                      {threads.filter(t => t.relevance_score > 15.0).length}
+                    </h3>
+                  </div>
+                  <Zap size={24} className={activeFilter === "score" ? "text-white/40" : "text-slate-700"} />
+                </div>
+              </Tooltip>
+
+              <Tooltip text="Maximum problem intensity detected in the current set.">
+                <div className="bg-slate-900 p-5 rounded-2xl border border-slate-800 flex items-center justify-between shadow-sm">
+                  <div>
+                    <p className="text-[10px] text-slate-500 uppercase tracking-widest mb-1">Max Intensity</p>
+                    <h3 className="text-2xl font-bold text-white">
+                      {threads.length > 0 ? Math.max(...threads.map(t => t.community_score)).toFixed(1) : "0.0"}
+                    </h3>
+                  </div>
+                  <TrendingUp size={24} className="text-slate-700" />
+                </div>
+              </Tooltip>
+
+              <Tooltip text="Average product alignment quality across pipeline.">
+                <div className="bg-slate-900 p-5 rounded-2xl border border-slate-800 flex items-center justify-between shadow-sm">
+                  <div>
+                    <p className="text-[10px] text-slate-500 uppercase tracking-widest mb-1">Avg Fit</p>
+                    <h3 className="text-2xl font-bold text-white">
+                      {threads.length > 0 ? Math.round((threads.reduce((acc, t) => acc + t.semantic_similarity, 0) / threads.length) * 100) : 0}%
+                    </h3>
+                  </div>
+                  <Radar size={24} className="text-slate-700" />
+                </div>
+              </Tooltip>
+            </div>
+
+            {/* Threads List */}
+            <div className="space-y-4">
+              <div className="flex items-center justify-between mb-6">
+                <h3 className="text-xl font-bold text-white flex items-center gap-3">
+                  <AlertTriangle className="text-yellow-500" />
+                  Intelligence Results
+                </h3>
+
+                <div className="flex bg-slate-900 p-1 rounded-lg border border-slate-800">
+                  <button
+                    onClick={() => setSortBy("relevance")}
+                    className={`px-4 py-1.5 rounded-md text-xs font-bold transition-all ${sortBy === "relevance" ? "bg-indigo-600 text-white" : "text-slate-500 hover:text-slate-300"}`}
+                  >
+                    Sort by Score
+                  </button>
+                  <button
+                    onClick={() => setSortBy("fit")}
+                    className={`px-4 py-1.5 rounded-md text-xs font-bold transition-all ${sortBy === "fit" ? "bg-indigo-600 text-white" : "text-slate-500 hover:text-slate-300"}`}
+                  >
+                    Sort by Fit
+                  </button>
+                  <button
+                    onClick={() => setSortBy("intensity")}
+                    className={`px-4 py-1.5 rounded-md text-xs font-bold transition-all ${sortBy === "intensity" ? "bg-indigo-600 text-white" : "text-slate-500 hover:text-slate-300"}`}
+                  >
+                    Sort by Intensity
+                  </button>
+                </div>
+              </div>
+
+              {loading ? (
+                <div className="h-64 flex items-center justify-center text-slate-500">Loading intelligence...</div>
+              ) : filteredThreads.length === 0 ? (
+                <div className="h-64 flex flex-col items-center justify-center text-slate-500 bg-slate-900/50 rounded-2xl border border-dashed border-slate-800">
+                  <Search className="mb-4 opacity-20" size={48} />
+                  <p className="text-lg font-medium">No results match this filter</p>
+                  <button
+                    onClick={() => setActiveFilter("all")}
+                    className="mt-4 text-indigo-400 hover:text-indigo-300 font-bold"
+                  >
+                    Clear all filters
+                  </button>
+                </div>
+              ) : (
+                filteredThreads.map((thread) => {
+                  const isExpanded = expandedThread === thread.id;
+                  const signals = thread.signals_json ? JSON.parse(thread.signals_json) : null;
+
+                  return (
+                    <div
+                      key={thread.id}
+                      className={`bg-slate-900 border transition-all group flex flex-col gap-0 rounded-2xl overflow-hidden ${isExpanded ? 'border-indigo-500 shadow-2xl shadow-indigo-500/10' : 'bg-slate-900/50 border-slate-800/50 hover:border-slate-700'
+                        }`}
+                    >
+                      <div
+                        className="p-6 flex items-start gap-6 cursor-pointer"
+                        onClick={() => setExpandedThread(isExpanded ? null : thread.id)}
+                      >
+                        <div className="flex flex-col items-center gap-1 min-w-[60px]">
+                          <span className="text-xs text-slate-500 uppercase font-semibold">Score</span>
+                          <div className="text-xl font-black text-indigo-400">{thread.relevance_score.toFixed(1)}</div>
+                        </div>
+
+                        <div className="flex-1 space-y-2">
+                          <div className="flex items-center gap-3">
+                            <span className="px-2 py-0.5 rounded bg-slate-800 text-[10px] font-bold text-indigo-300 uppercase">r/{thread.source}</span>
+                            <span className="text-[10px] text-slate-500">●</span>
+                            <span className="text-[10px] text-slate-500">{new Date(thread.created_at).toLocaleDateString()}</span>
                           </div>
-                          <div className="flex justify-between items-center">
-                            <span className="text-[9px] text-slate-400 truncate w-1/2 font-medium">r/{run.subreddits}</span>
-                            <span className={`text-[8px] px-2 py-0.5 rounded-full font-black uppercase tracking-widest ${run.status === 'Success' ? 'bg-emerald-500/10 text-emerald-500' :
-                              run.status.startsWith('Error') ? 'bg-red-500/10 text-red-500' : 'bg-indigo-500/10 text-indigo-400'
+                          <h4 className="text-lg font-bold text-slate-100 group-hover:text-white leading-tight">{thread.title}</h4>
+                          {!isExpanded && <p className="text-sm text-slate-400 line-clamp-2 leading-relaxed">{thread.body}</p>}
+
+                          <div className="flex items-center gap-6 pt-2">
+                            <div className="flex items-center gap-2">
+                              <div className="w-16 h-1 bg-slate-800 rounded-full overflow-hidden">
+                                <div className="h-full bg-indigo-500" style={{ width: `${thread.semantic_similarity * 100}%` }}></div>
+                              </div>
+                              <span className="text-[10px] font-semibold text-slate-500 uppercase">Fit: {Math.round(thread.semantic_similarity * 100)}%</span>
+                            </div>
+                            <div className="flex items-center gap-2 text-slate-500">
+                              <BarChart3 size={14} />
+                              <span className="text-[10px] font-semibold uppercase">Intensity: {thread.community_score.toFixed(1)}</span>
+                            </div>
+                            <div className={`flex items-center gap-1 text-[10px] font-bold uppercase ml-auto px-3 py-1.5 rounded-lg border transition-all ${isExpanded
+                              ? 'bg-slate-800 border-slate-700 text-slate-400'
+                              : 'bg-indigo-500/10 border-indigo-500/20 text-indigo-400 hover:bg-indigo-500/20 hover:border-indigo-500/40'
                               }`}>
-                              {run.status.split(':')[0]}
-                            </span>
+                              {isExpanded ? "Collapse" : "View Analysis"}
+                              <ChevronDown size={14} className={`transition-transform duration-300 ${isExpanded ? 'rotate-180' : ''}`} />
+                            </div>
+
+                            {thread.is_stale === 1 && (
+                              <div
+                                className="flex items-center gap-1 px-2 py-1 bg-amber-500/10 border border-amber-500/20 rounded-lg animate-pulse"
+                                title={`Metrics changed significantly since last review (Previous Score: ${thread.triage_relevance_snapshot?.toFixed(1)})`}
+                              >
+                                <AlertTriangle size={12} className="text-amber-500" />
+                                <span className="text-[9px] font-black text-amber-500 uppercase tracking-tighter">Review Needed</span>
+                              </div>
+                            )}
+                            <div className="flex items-center gap-1.5 p-1 bg-slate-900/80 border border-slate-700/50 rounded-lg ml-2">
+                              <button
+                                onClick={(e) => { e.stopPropagation(); handleTriage(thread.id, 'agree'); }}
+                                className={`p-1.5 rounded-md transition-all ${thread.triage_status === 'agree' ? 'bg-emerald-500 text-white shadow-lg shadow-emerald-500/20' : 'text-slate-500 hover:bg-slate-800 hover:text-emerald-400'}`}
+                                title="Agree with this lead"
+                              >
+                                <ThumbsUp size={14} />
+                              </button>
+                              <button
+                                onClick={(e) => { e.stopPropagation(); handleTriage(thread.id, 'disagree'); }}
+                                className={`p-1.5 rounded-md transition-all ${thread.triage_status === 'disagree' ? 'bg-red-500 text-white shadow-lg shadow-red-500/20' : 'text-slate-500 hover:bg-slate-800 hover:text-red-400'}`}
+                                title="Disagree with this lead"
+                              >
+                                <ThumbsDown size={14} />
+                              </button>
+                            </div>
                           </div>
                         </div>
-                      ))
-                    )}
-                  </div>
-                </section>
-              </div>
-            </div>
-
-            <div className="p-6 border-t border-slate-800 bg-slate-900/50 flex items-center justify-between">
-              <div className="flex items-center gap-3 text-slate-500 hover:text-slate-300 transition-colors cursor-pointer">
-                <Settings size={18} />
-                <span className="text-sm">Settings</span>
-              </div>
-              <UserButton afterSignOutUrl="/" />
-            </div>
-          </aside>
-
-          {/* Main Content */}
-          <main className="flex-1 p-10 overflow-y-auto">
-            <ProductModal
-              isOpen={isModalOpen}
-              onClose={() => setIsModalOpen(false)}
-              onSave={handleSaveProduct}
-              product={editingProduct}
-            />
-
-            {view === "dashboard" ? (
-              <>
-                <header className="flex justify-between items-end mb-12">
-                  <div>
-                    <h2 className="text-4xl font-extrabold text-white mb-2">Discovery Dashboard</h2>
-                    <p className="text-slate-400">Total high-relevance matches found: <span className="text-indigo-400 font-bold">{threads.length}</span></p>
-                  </div>
-                  <div className="flex gap-4">
-                    <button onClick={fetchThreads} className="p-3 bg-slate-900 border border-slate-800 rounded-lg text-slate-400 hover:text-white transition-all">
-                      <RefreshCw size={20} className={loading ? 'animate-spin' : ''} />
-                    </button>
-                  </div>
-                </header>
-
-                {/* Stats Grid */}
-                <div className="grid grid-cols-5 gap-4 mb-12">
-                  <Tooltip text="Measures the depth and frequency of problem discussion. Click to filter hot topics.">
-                    <div
-                      onClick={() => {
-                        const newVal = activeFilter === "intensity" ? "all" : "intensity";
-                        setActiveFilter(newVal);
-                        setSortBy(newVal === "intensity" ? "intensity" : "relevance");
-                      }}
-                      className={`p-5 rounded-2xl border transition-all cursor-pointer flex items-center justify-between shadow-sm ${activeFilter === "intensity" ? "bg-indigo-600 border-indigo-400 shadow-indigo-500/20" : "bg-slate-900 border-slate-800 hover:border-indigo-500/30"
-                        }`}
-                    >
-                      <div>
-                        <p className={`text-[10px] uppercase tracking-widest mb-1 flex items-center gap-1 ${activeFilter === "intensity" ? "text-indigo-100" : "text-slate-500"}`}>
-                          High Intensity <HelpCircle size={10} />
-                        </p>
-                        <h3 className={`text-2xl font-bold ${activeFilter === "intensity" ? "text-white" : "text-orange-400"}`}>
-                          {threads.filter(t => t.community_score > 3.0).length}
-                        </h3>
                       </div>
-                      <BarChart3 size={24} className={activeFilter === "intensity" ? "text-white/40" : "text-slate-700"} />
-                    </div>
-                  </Tooltip>
 
-                  <Tooltip text="Number of posts that directly match your product signals. Click to filter.">
-                    <div
-                      onClick={() => {
-                        const newVal = activeFilter === "fit" ? "all" : "fit";
-                        setActiveFilter(newVal);
-                        setSortBy(newVal === "fit" ? "fit" : "relevance");
-                      }}
-                      className={`p-5 rounded-2xl border transition-all cursor-pointer flex items-center justify-between shadow-sm ${activeFilter === "fit" ? "bg-indigo-600 border-indigo-400 shadow-indigo-500/20" : "bg-slate-900 border-slate-800 hover:border-indigo-500/30"
-                        }`}
-                    >
-                      <div>
-                        <p className={`text-[10px] uppercase tracking-widest mb-1 flex items-center gap-1 ${activeFilter === "fit" ? "text-indigo-100" : "text-slate-500"}`}>
-                          High Fit Leads <HelpCircle size={10} />
-                        </p>
-                        <h3 className={`text-2xl font-bold ${activeFilter === "fit" ? "text-white" : "text-emerald-400"}`}>
-                          {threads.filter(t => t.semantic_similarity > 0.5).length}
-                        </h3>
-                      </div>
-                      <CheckCircle2 size={24} className={activeFilter === "fit" ? "text-white/40" : "text-slate-700"} />
-                    </div>
-                  </Tooltip>
-
-                  <Tooltip text="Highly relevant leads based on combined score. Click to filter.">
-                    <div
-                      onClick={() => {
-                        const newVal = activeFilter === "score" ? "all" : "score";
-                        setActiveFilter(newVal);
-                        setSortBy("relevance");
-                      }}
-                      className={`p-5 rounded-2xl border transition-all cursor-pointer flex items-center justify-between shadow-sm ${activeFilter === "score" ? "bg-indigo-600 border-indigo-400 shadow-indigo-500/20" : "bg-slate-900 border-slate-800 hover:border-indigo-500/30"
-                        }`}
-                    >
-                      <div>
-                        <p className={`text-[10px] uppercase tracking-widest mb-1 flex items-center gap-1 ${activeFilter === "score" ? "text-indigo-100" : "text-slate-500"}`}>
-                          High Score <HelpCircle size={10} />
-                        </p>
-                        <h3 className={`text-2xl font-bold ${activeFilter === "score" ? "text-white" : "text-indigo-400"}`}>
-                          {threads.filter(t => t.relevance_score > 15.0).length}
-                        </h3>
-                      </div>
-                      <Zap size={24} className={activeFilter === "score" ? "text-white/40" : "text-slate-700"} />
-                    </div>
-                  </Tooltip>
-
-                  <Tooltip text="Maximum problem intensity detected in the current set.">
-                    <div className="bg-slate-900 p-5 rounded-2xl border border-slate-800 flex items-center justify-between shadow-sm">
-                      <div>
-                        <p className="text-[10px] text-slate-500 uppercase tracking-widest mb-1">Max Intensity</p>
-                        <h3 className="text-2xl font-bold text-white">
-                          {threads.length > 0 ? Math.max(...threads.map(t => t.community_score)).toFixed(1) : "0.0"}
-                        </h3>
-                      </div>
-                      <TrendingUp size={24} className="text-slate-700" />
-                    </div>
-                  </Tooltip>
-
-                  <Tooltip text="Average product alignment quality across pipeline.">
-                    <div className="bg-slate-900 p-5 rounded-2xl border border-slate-800 flex items-center justify-between shadow-sm">
-                      <div>
-                        <p className="text-[10px] text-slate-500 uppercase tracking-widest mb-1">Avg Fit</p>
-                        <h3 className="text-2xl font-bold text-white">
-                          {threads.length > 0 ? Math.round((threads.reduce((acc, t) => acc + t.semantic_similarity, 0) / threads.length) * 100) : 0}%
-                        </h3>
-                      </div>
-                      <Radar size={24} className="text-slate-700" />
-                    </div>
-                  </Tooltip>
-                </div>
-
-                {/* Threads List */}
-                <div className="space-y-4">
-                  <div className="flex items-center justify-between mb-6">
-                    <h3 className="text-xl font-bold text-white flex items-center gap-3">
-                      <AlertTriangle className="text-yellow-500" />
-                      Intelligence Results
-                    </h3>
-
-                    <div className="flex bg-slate-900 p-1 rounded-lg border border-slate-800">
-                      <button
-                        onClick={() => setSortBy("relevance")}
-                        className={`px-4 py-1.5 rounded-md text-xs font-bold transition-all ${sortBy === "relevance" ? "bg-indigo-600 text-white" : "text-slate-500 hover:text-slate-300"}`}
-                      >
-                        Sort by Score
-                      </button>
-                      <button
-                        onClick={() => setSortBy("fit")}
-                        className={`px-4 py-1.5 rounded-md text-xs font-bold transition-all ${sortBy === "fit" ? "bg-indigo-600 text-white" : "text-slate-500 hover:text-slate-300"}`}
-                      >
-                        Sort by Fit
-                      </button>
-                      <button
-                        onClick={() => setSortBy("intensity")}
-                        className={`px-4 py-1.5 rounded-md text-xs font-bold transition-all ${sortBy === "intensity" ? "bg-indigo-600 text-white" : "text-slate-500 hover:text-slate-300"}`}
-                      >
-                        Sort by Intensity
-                      </button>
-                    </div>
-                  </div>
-
-                  {loading ? (
-                    <div className="h-64 flex items-center justify-center text-slate-500">Loading intelligence...</div>
-                  ) : filteredThreads.length === 0 ? (
-                    <div className="h-64 flex flex-col items-center justify-center text-slate-500 bg-slate-900/50 rounded-2xl border border-dashed border-slate-800">
-                      <Search className="mb-4 opacity-20" size={48} />
-                      <p className="text-lg font-medium">No results match this filter</p>
-                      <button
-                        onClick={() => setActiveFilter("all")}
-                        className="mt-4 text-indigo-400 hover:text-indigo-300 font-bold"
-                      >
-                        Clear all filters
-                      </button>
-                    </div>
-                  ) : (
-                    filteredThreads.map((thread) => {
-                      const isExpanded = expandedThread === thread.id;
-                      const signals = thread.signals_json ? JSON.parse(thread.signals_json) : null;
-
-                      return (
-                        <div
-                          key={thread.id}
-                          className={`bg-slate-900 border transition-all group flex flex-col gap-0 rounded-2xl overflow-hidden ${isExpanded ? 'border-indigo-500 shadow-2xl shadow-indigo-500/10' : 'bg-slate-900/50 border-slate-800/50 hover:border-slate-700'
-                            }`}
-                        >
-                          <div
-                            className="p-6 flex items-start gap-6 cursor-pointer"
-                            onClick={() => setExpandedThread(isExpanded ? null : thread.id)}
-                          >
-                            <div className="flex flex-col items-center gap-1 min-w-[60px]">
-                              <span className="text-xs text-slate-500 uppercase font-semibold">Score</span>
-                              <div className="text-xl font-black text-indigo-400">{thread.relevance_score.toFixed(1)}</div>
-                            </div>
-
-                            <div className="flex-1 space-y-2">
-                              <div className="flex items-center gap-3">
-                                <span className="px-2 py-0.5 rounded bg-slate-800 text-[10px] font-bold text-indigo-300 uppercase">r/{thread.source}</span>
-                                <span className="text-[10px] text-slate-500">●</span>
-                                <span className="text-[10px] text-slate-500">{new Date(thread.created_at).toLocaleDateString()}</span>
-                              </div>
-                              <h4 className="text-lg font-bold text-slate-100 group-hover:text-white leading-tight">{thread.title}</h4>
-                              {!isExpanded && <p className="text-sm text-slate-400 line-clamp-2 leading-relaxed">{thread.body}</p>}
-
-                              <div className="flex items-center gap-6 pt-2">
-                                <div className="flex items-center gap-2">
-                                  <div className="w-16 h-1 bg-slate-800 rounded-full overflow-hidden">
-                                    <div className="h-full bg-indigo-500" style={{ width: `${thread.semantic_similarity * 100}%` }}></div>
-                                  </div>
-                                  <span className="text-[10px] font-semibold text-slate-500 uppercase">Fit: {Math.round(thread.semantic_similarity * 100)}%</span>
-                                </div>
-                                <div className="flex items-center gap-2 text-slate-500">
-                                  <BarChart3 size={14} />
-                                  <span className="text-[10px] font-semibold uppercase">Intensity: {thread.community_score.toFixed(1)}</span>
-                                </div>
-                                <div className={`flex items-center gap-1 text-[10px] font-bold uppercase ml-auto px-3 py-1.5 rounded-lg border transition-all ${isExpanded
-                                  ? 'bg-slate-800 border-slate-700 text-slate-400'
-                                  : 'bg-indigo-500/10 border-indigo-500/20 text-indigo-400 hover:bg-indigo-500/20 hover:border-indigo-500/40'
-                                  }`}>
-                                  {isExpanded ? "Collapse" : "View Analysis"}
-                                  <ChevronDown size={14} className={`transition-transform duration-300 ${isExpanded ? 'rotate-180' : ''}`} />
-                                </div>
-
-                                {thread.is_stale === 1 && (
-                                  <div
-                                    className="flex items-center gap-1 px-2 py-1 bg-amber-500/10 border border-amber-500/20 rounded-lg animate-pulse"
-                                    title={`Metrics changed significantly since last review (Previous Score: ${thread.triage_relevance_snapshot?.toFixed(1)})`}
-                                  >
-                                    <AlertTriangle size={12} className="text-amber-500" />
-                                    <span className="text-[9px] font-black text-amber-500 uppercase tracking-tighter">Review Needed</span>
-                                  </div>
-                                )}
-                                <div className="flex items-center gap-1.5 p-1 bg-slate-900/80 border border-slate-700/50 rounded-lg ml-2">
-                                  <button
-                                    onClick={(e) => { e.stopPropagation(); handleTriage(thread.id, 'agree'); }}
-                                    className={`p-1.5 rounded-md transition-all ${thread.triage_status === 'agree' ? 'bg-emerald-500 text-white shadow-lg shadow-emerald-500/20' : 'text-slate-500 hover:bg-slate-800 hover:text-emerald-400'}`}
-                                    title="Agree with this lead"
-                                  >
-                                    <ThumbsUp size={14} />
-                                  </button>
-                                  <button
-                                    onClick={(e) => { e.stopPropagation(); handleTriage(thread.id, 'disagree'); }}
-                                    className={`p-1.5 rounded-md transition-all ${thread.triage_status === 'disagree' ? 'bg-red-500 text-white shadow-lg shadow-red-500/20' : 'text-slate-500 hover:bg-slate-800 hover:text-red-400'}`}
-                                    title="Disagree with this lead"
-                                  >
-                                    <ThumbsDown size={14} />
-                                  </button>
-                                </div>
-                              </div>
-                            </div>
-                          </div>
-
-                          {isExpanded && (
-                            <div className="px-6 pb-6 pt-0 animate-in fade-in slide-in-from-top-2 duration-300">
-                              <div className="border-t border-slate-800 pt-6 space-y-6">
-                                {/* Tags Section */}
-                                {signals && (
-                                  <div className="flex flex-wrap gap-2">
-                                    {signals.intents?.map(intent => (
-                                      <span key={intent} className="px-2 py-1 rounded-full bg-indigo-500/10 border border-indigo-500/20 text-[10px] font-bold text-indigo-400 uppercase">
-                                        {intent}
+                      {isExpanded && (
+                        <div className="px-6 pb-6 pt-0 animate-in fade-in slide-in-from-top-2 duration-300">
+                          <div className="border-t border-slate-800 pt-6 space-y-6">
+                            {/* Tags Section */}
+                            {signals && (
+                              <div className="flex flex-wrap gap-2">
+                                {signals.intents?.map(intent => (
+                                  <span key={intent} className="px-2 py-1 rounded-full bg-indigo-500/10 border border-indigo-500/20 text-[10px] font-bold text-indigo-400 uppercase">
+                                    {intent}
+                                  </span>
+                                ))}
+                                {signals.product_matches && signals.product_matches[selectedProduct.toLowerCase()] && (
+                                  <>
+                                    {signals.product_matches[selectedProduct.toLowerCase()].intents?.map(p_intent => (
+                                      <span key={p_intent} className="px-2 py-1 rounded-full bg-indigo-500/10 border border-indigo-500/20 text-[10px] font-bold text-cyan-400 uppercase">
+                                        {p_intent}
                                       </span>
                                     ))}
-                                    {signals.product_matches && signals.product_matches[selectedProduct.toLowerCase()] && (
-                                      <>
-                                        {signals.product_matches[selectedProduct.toLowerCase()].intents?.map(p_intent => (
-                                          <span key={p_intent} className="px-2 py-1 rounded-full bg-indigo-500/10 border border-indigo-500/20 text-[10px] font-bold text-cyan-400 uppercase">
-                                            {p_intent}
-                                          </span>
-                                        ))}
-                                        {signals.product_matches[selectedProduct.toLowerCase()].pain_points?.map(p_point => (
-                                          <span key={p_point} className="px-2 py-1 rounded-full bg-orange-500/10 border border-orange-500/20 text-[10px] font-bold text-orange-400 uppercase">
-                                            {p_point}
-                                          </span>
-                                        ))}
-                                      </>
-                                    )}
-                                  </div>
+                                    {signals.product_matches[selectedProduct.toLowerCase()].pain_points?.map(p_point => (
+                                      <span key={p_point} className="px-2 py-1 rounded-full bg-orange-500/10 border border-orange-500/20 text-[10px] font-bold text-orange-400 uppercase">
+                                        {p_point}
+                                      </span>
+                                    ))}
+                                  </>
                                 )}
+                              </div>
+                            )}
 
-                                {/* Analysis Section */}
-                                <div className="grid grid-cols-2 gap-8">
-                                  <div className="space-y-3">
-                                    <h5 className="text-xs font-bold text-slate-500 uppercase tracking-widest flex items-center gap-2">
-                                      <FileText size={14} /> Full Thread Content
-                                    </h5>
-                                    <div className="text-sm text-slate-300 bg-slate-800/50 p-4 rounded-xl border border-slate-800 leading-relaxed max-h-64 overflow-y-auto custom-scrollbar">
-                                      {thread.body}
-                                      <div className="mt-4 pt-4 border-t border-slate-800">
-                                        <a href={thread.url} target="_blank" rel="noreferrer" className="text-indigo-400 hover:text-indigo-300 font-bold flex items-center gap-1">
-                                          Open Original Post <ExternalLink size={14} />
-                                        </a>
-                                      </div>
-                                    </div>
-
-                                    <h5 className="text-xs font-bold text-slate-500 uppercase tracking-widest flex items-center gap-2 mt-8">
-                                      <Sparkles size={14} className="text-purple-500" /> Profile Intelligence
-                                    </h5>
-                                    {thread.generatedResponse ? (
-                                      <ResponseCard
-                                        response={thread.generatedResponse}
-                                        postUrl={thread.url}
-                                        postId={thread.id}
-                                        productId={selectedProduct}
-                                        loading={thread.isRegenerating}
-                                        error={thread.genError}
-                                        availableStyles={['empathetic', 'helpful_expert', 'casual', 'technical', 'brief']}
-                                        onRegenerate={(style) => {
-                                          const handleGen = async () => {
-                                            setThreads(prev => prev.map(t =>
-                                              t.id === thread.id ? { ...t, isRegenerating: true, genError: null } : t
-                                            ));
-
-                                            try {
-                                              const headers = await getAuthHeaders();
-                                              const resp = await axios.post(`${API_BASE}/api/responses/generate/${thread.id}`, {
-                                                product_id: selectedProduct,
-                                                style: style
-                                              }, { headers });
-                                              setThreads(prev => prev.map(t =>
-                                                t.id === thread.id ? { ...t, generatedResponse: resp.data, isRegenerating: false, genError: null } : t
-                                              ));
-                                            } catch (err) {
-                                              setThreads(prev => prev.map(t =>
-                                                t.id === thread.id ? { ...t, isRegenerating: false, genError: "Failed to generate. Try again." } : t
-                                              ));
-                                            }
-                                          };
-                                          handleGen();
-                                        }}
-                                      />
-                                    ) : (
-                                      <GenerateResponseButton
-                                        postId={thread.id}
-                                        productId={selectedProduct}
-                                        defaultStyle={JSON.parse(thread.ai_analysis || '{}').urgency === 'High' ? 'empathetic' : 'helpful_expert'}
-                                        onGenerated={(res) => {
-                                          setThreads(prev => prev.map(t =>
-                                            t.id === thread.id ? { ...t, generatedResponse: res, isRegenerating: false, genError: null } : t
-                                          ));
-                                        }}
-                                      />
-                                    )}
-                                  </div>
-
-                                  <div className="space-y-3">
-                                    <h5 className="text-xs font-bold text-slate-500 uppercase tracking-widest flex items-center gap-2">
-                                      <Zap size={14} className="text-yellow-500" /> AI Insight for {selectedProduct.toUpperCase()}
-                                    </h5>
-                                    <div className="text-sm text-slate-200 bg-indigo-500/5 p-6 rounded-2xl border border-indigo-500/10 leading-relaxed shadow-inner mb-6 space-y-4">
-                                      {(() => {
-                                        if (!thread.ai_analysis) return <p className="italic text-slate-500">AI analysis not required for this relevance level.</p>;
-                                        try {
-                                          const ai = JSON.parse(thread.ai_analysis);
-                                          if (ai.error) return <p className="text-red-400">Analysis failed: {ai.details}</p>;
-                                          return (
-                                            <div className="space-y-4">
-                                              <div className="flex justify-between items-start gap-4">
-                                                <div className="flex-1">
-                                                  <div className="flex items-center gap-2 mb-3">
-                                                    <div className="p-1 rounded bg-indigo-500/10 border border-indigo-500/20">
-                                                      <User size={10} className="text-indigo-400" />
-                                                    </div>
-                                                    <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">u/{ai.pain_author || thread.author}</span>
-                                                    {ai.is_from_comment ? (
-                                                      <span className="text-[9px] px-1.5 py-0.5 rounded-full bg-slate-800 text-slate-500 border border-slate-700 font-medium">Commenter</span>
-                                                    ) : (
-                                                      <span className="text-[9px] px-1.5 py-0.5 rounded-full bg-indigo-500/10 text-indigo-400 border border-indigo-500/20 font-medium">Author</span>
-                                                    )}
-                                                  </div>
-                                                  <p className="font-bold text-indigo-300 text-lg mb-1 leading-snug">{ai.pain_point_summary}</p>
-                                                  <p className="text-xs text-slate-400 italic">"{ai.pain_quote}"</p>
-                                                </div>
-                                                <div className="flex flex-col items-end gap-2">
-                                                  <span className={`px-2 py-1 rounded-md text-[10px] font-black uppercase tracking-tighter ${ai.urgency === 'High' ? 'bg-red-500/20 text-red-400 border border-red-500/30' :
-                                                    ai.urgency === 'Medium' ? 'bg-orange-500/20 text-orange-400 border border-orange-500/30' :
-                                                      'bg-slate-700/50 text-slate-400'
-                                                    }`}>
-                                                    {ai.urgency} Urgency
-                                                  </span>
-                                                  <div className="flex items-center gap-1">
-                                                    <div className="h-1.5 w-16 bg-slate-800 rounded-full overflow-hidden">
-                                                      <div className="h-full bg-indigo-500" style={{ width: `${(ai.product_relevance || 0) * 10}%` }}></div>
-                                                    </div>
-                                                    <span className="text-[10px] font-bold text-indigo-400">{ai.product_relevance}/10</span>
-                                                  </div>
-                                                </div>
-                                              </div>
-
-                                              <div className="grid grid-cols-1 gap-4 pt-4 border-t border-indigo-500/10">
-                                                <div>
-                                                  <p className="text-[10px] font-bold text-slate-500 uppercase mb-1">Why it matters</p>
-                                                  <p className="text-[12px] text-slate-300">{ai.relevance_explanation}</p>
-                                                </div>
-                                                <div className="bg-indigo-500/10 p-3 rounded-xl border border-indigo-500/20">
-                                                  <p className="text-[10px] font-bold text-indigo-400 uppercase mb-1 flex items-center gap-1">
-                                                    <MessageSquare size={12} /> Suggested Angle
-                                                  </p>
-                                                  <p className="text-[12px] text-indigo-100 italic">{ai.response_angle}</p>
-                                                </div>
-                                              </div>
-                                            </div>
-                                          );
-                                        } catch (e) {
-                                          return <div className="whitespace-pre-line">{thread.ai_analysis}</div>;
-                                        }
-                                      })()}
-                                    </div>
-
-                                    <h5 className="text-xs font-bold text-slate-500 uppercase tracking-widest flex items-center gap-2">
-                                      <MessageSquare size={14} className="text-indigo-400" /> Top Community Responses
-                                    </h5>
-                                    <CommentsSection postId={thread.id} />
+                            {/* Analysis Section */}
+                            <div className="grid grid-cols-2 gap-8">
+                              <div className="space-y-3">
+                                <h5 className="text-xs font-bold text-slate-500 uppercase tracking-widest flex items-center gap-2">
+                                  <FileText size={14} /> Full Thread Content
+                                </h5>
+                                <div className="text-sm text-slate-300 bg-slate-800/50 p-4 rounded-xl border border-slate-800 leading-relaxed max-h-64 overflow-y-auto custom-scrollbar">
+                                  {thread.body}
+                                  <div className="mt-4 pt-4 border-t border-slate-800">
+                                    <a href={thread.url} target="_blank" rel="noreferrer" className="text-indigo-400 hover:text-indigo-300 font-bold flex items-center gap-1">
+                                      Open Original Post <ExternalLink size={14} />
+                                    </a>
                                   </div>
                                 </div>
+
+                                <h5 className="text-xs font-bold text-slate-500 uppercase tracking-widest flex items-center gap-2 mt-8">
+                                  <Sparkles size={14} className="text-purple-500" /> Profile Intelligence
+                                </h5>
+                                {thread.generatedResponse ? (
+                                  <ResponseCard
+                                    response={thread.generatedResponse}
+                                    postUrl={thread.url}
+                                    postId={thread.id}
+                                    productId={selectedProduct}
+                                    loading={thread.isRegenerating}
+                                    error={thread.genError}
+                                    availableStyles={['empathetic', 'helpful_expert', 'casual', 'technical', 'brief']}
+                                    onRegenerate={(style) => {
+                                      const handleGen = async () => {
+                                        setThreads(prev => prev.map(t =>
+                                          t.id === thread.id ? { ...t, isRegenerating: true, genError: null } : t
+                                        ));
+
+                                        try {
+                                          const headers = await getAuthHeaders();
+                                          const resp = await axios.post(`${API_BASE}/api/responses/generate/${thread.id}`, {
+                                            product_id: selectedProduct,
+                                            style: style
+                                          }, { headers });
+                                          setThreads(prev => prev.map(t =>
+                                            t.id === thread.id ? { ...t, generatedResponse: resp.data, isRegenerating: false, genError: null } : t
+                                          ));
+                                        } catch (err) {
+                                          setThreads(prev => prev.map(t =>
+                                            t.id === thread.id ? { ...t, isRegenerating: false, genError: "Failed to generate. Try again." } : t
+                                          ));
+                                        }
+                                      };
+                                      handleGen();
+                                    }}
+                                  />
+                                ) : (
+                                  <GenerateResponseButton
+                                    postId={thread.id}
+                                    productId={selectedProduct}
+                                    defaultStyle={JSON.parse(thread.ai_analysis || '{}').urgency === 'High' ? 'empathetic' : 'helpful_expert'}
+                                    onGenerated={(res) => {
+                                      setThreads(prev => prev.map(t =>
+                                        t.id === thread.id ? { ...t, generatedResponse: res, isRegenerating: false, genError: null } : t
+                                      ));
+                                    }}
+                                  />
+                                )}
+                              </div>
+
+                              <div className="space-y-3">
+                                <h5 className="text-xs font-bold text-slate-500 uppercase tracking-widest flex items-center gap-2">
+                                  <Zap size={14} className="text-yellow-500" /> AI Insight for {selectedProduct.toUpperCase()}
+                                </h5>
+                                <div className="text-sm text-slate-200 bg-indigo-500/5 p-6 rounded-2xl border border-indigo-500/10 leading-relaxed shadow-inner mb-6 space-y-4">
+                                  {(() => {
+                                    if (!thread.ai_analysis) return <p className="italic text-slate-500">AI analysis not required for this relevance level.</p>;
+                                    try {
+                                      const ai = JSON.parse(thread.ai_analysis);
+                                      if (ai.error) return <p className="text-red-400">Analysis failed: {ai.details}</p>;
+                                      return (
+                                        <div className="space-y-4">
+                                          <div className="flex justify-between items-start gap-4">
+                                            <div className="flex-1">
+                                              <div className="flex items-center gap-2 mb-3">
+                                                <div className="p-1 rounded bg-indigo-500/10 border border-indigo-500/20">
+                                                  <User size={10} className="text-indigo-400" />
+                                                </div>
+                                                <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">u/{ai.pain_author || thread.author}</span>
+                                                {ai.is_from_comment ? (
+                                                  <span className="text-[9px] px-1.5 py-0.5 rounded-full bg-slate-800 text-slate-500 border border-slate-700 font-medium">Commenter</span>
+                                                ) : (
+                                                  <span className="text-[9px] px-1.5 py-0.5 rounded-full bg-indigo-500/10 text-indigo-400 border border-indigo-500/20 font-medium">Author</span>
+                                                )}
+                                              </div>
+                                              <p className="font-bold text-indigo-300 text-lg mb-1 leading-snug">{ai.pain_point_summary}</p>
+                                              <p className="text-xs text-slate-400 italic">"{ai.pain_quote}"</p>
+                                            </div>
+                                            <div className="flex flex-col items-end gap-2">
+                                              <span className={`px-2 py-1 rounded-md text-[10px] font-black uppercase tracking-tighter ${ai.urgency === 'High' ? 'bg-red-500/20 text-red-400 border border-red-500/30' :
+                                                ai.urgency === 'Medium' ? 'bg-orange-500/20 text-orange-400 border border-orange-500/30' :
+                                                  'bg-slate-700/50 text-slate-400'
+                                                }`}>
+                                                {ai.urgency} Urgency
+                                              </span>
+                                              <div className="flex items-center gap-1">
+                                                <div className="h-1.5 w-16 bg-slate-800 rounded-full overflow-hidden">
+                                                  <div className="h-full bg-indigo-500" style={{ width: `${(ai.product_relevance || 0) * 10}%` }}></div>
+                                                </div>
+                                                <span className="text-[10px] font-bold text-indigo-400">{ai.product_relevance}/10</span>
+                                              </div>
+                                            </div>
+                                          </div>
+
+                                          <div className="grid grid-cols-1 gap-4 pt-4 border-t border-indigo-500/10">
+                                            <div>
+                                              <p className="text-[10px] font-bold text-slate-500 uppercase mb-1">Why it matters</p>
+                                              <p className="text-[12px] text-slate-300">{ai.relevance_explanation}</p>
+                                            </div>
+                                            <div className="bg-indigo-500/10 p-3 rounded-xl border border-indigo-500/20">
+                                              <p className="text-[10px] font-bold text-indigo-400 uppercase mb-1 flex items-center gap-1">
+                                                <MessageSquare size={12} /> Suggested Angle
+                                              </p>
+                                              <p className="text-[12px] text-indigo-100 italic">{ai.response_angle}</p>
+                                            </div>
+                                          </div>
+                                        </div>
+                                      );
+                                    } catch (e) {
+                                      return <div className="whitespace-pre-line">{thread.ai_analysis}</div>;
+                                    }
+                                  })()}
+                                </div>
+
+                                <h5 className="text-xs font-bold text-slate-500 uppercase tracking-widest flex items-center gap-2">
+                                  <MessageSquare size={14} className="text-indigo-400" /> Top Community Responses
+                                </h5>
+                                <CommentsSection postId={thread.id} />
                               </div>
                             </div>
-                          )}
+                          </div>
                         </div>
-                      );
-                    })
-                  )}
-                </div >
-              </>
-            ) : (
-              <ProductManagement
-                products={products}
-                onEdit={openEdit}
-                onDelete={handleDeleteProduct}
-                onCreate={openCreate}
-              />
-            )}
-            {
-              showOnboarding && (
-                <OnboardingWizard
-                  steps={discoverySteps}
-                  onComplete={handleOnboardingComplete}
-                />
-              )
-            }
-          </main >
-        </div>
-      </SignedIn>
+                      )}
+                    </div>
+                  );
+                })
+              )}
+            </div >
+          </>
+        ) : (
+          <ProductManagement
+            products={products}
+            onEdit={openEdit}
+            onDelete={handleDeleteProduct}
+            onCreate={openCreate}
+          />
+        )}
+        {
+          showOnboarding && (
+            <OnboardingWizard
+              steps={discoverySteps}
+              onComplete={handleOnboardingComplete}
+            />
+          )
+        }
+      </main >
+    </div >
+      </SignedIn >
     </>
   );
 }

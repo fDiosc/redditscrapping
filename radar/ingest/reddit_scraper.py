@@ -131,10 +131,11 @@ class RedditScraper:
         """
         posts_added = 0
         cutoff = datetime.utcnow().timestamp() - (days * 86400)
+        cutoff_date = datetime.fromtimestamp(cutoff).strftime('%Y-%m-%d %H:%M:%S UTC')
         after = None
         max_total = 500 # Safety cap to avoid infinite loops or massive scraping
         
-        print(f"DEBUG: Starting deep sync for r/{subreddit_name} (Cutoff: {days} days)", flush=True)
+        print(f"DEBUG: Starting deep sync for r/{subreddit_name} (Max {days} days | Cutoff: {cutoff_date})", flush=True)
 
         while posts_added < max_total:
             url = f"https://www.reddit.com/r/{subreddit_name}/new/.json?limit={limit}"

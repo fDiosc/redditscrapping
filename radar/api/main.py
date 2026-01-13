@@ -99,7 +99,7 @@ async def get_threads(user_id: str = Depends(get_current_user), product: str = N
 @app.post("/api/threads/{post_id}/triage")
 async def triage_thread(
     post_id: str, 
-    status: str = Query(..., regex="^(agree|disagree|null)$"),
+    status: str = Query(..., pattern="^(agree|disagree|null)$"),
     product_id: str = Query(...),
     user_id: str = Depends(get_current_user)
 ):
