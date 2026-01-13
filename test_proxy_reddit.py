@@ -22,13 +22,25 @@ def test_reddit_proxy(subreddit):
     }
     
     try:
-        # Using impersonate="chrome110" + Residential Proxy
-        # verify=False is used because of the "self signed certificate" error with Bright Data/EC2
+        # Advanced Stealth Headers
+        headers = {
+            "Accept": "application/json, text/plain, */*",
+            "Accept-Language": "en-US,en;q=0.9",
+            "Referer": "https://www.reddit.com/",
+            "Sec-Fetch-Dest": "empty",
+            "Sec-Fetch-Mode": "cors",
+            "Sec-Fetch-Site": "same-origin",
+            "Pragma": "no-cache",
+            "Cache-Control": "no-cache",
+        }
+
+        print(f"Applying stealth headers and requesting...")
+        
         response = requests.get(
             url, 
             impersonate="chrome110", 
             proxies=proxies,
-            headers={"Accept": "application/json"},
+            headers=headers,
             timeout=30,
             verify=False
         )
