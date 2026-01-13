@@ -407,43 +407,61 @@ const LandingPage = ({ onGetStarted, onSignIn }) => {
             <footer className="py-20 border-t border-white/5 bg-slate-950">
                 <div className="max-w-7xl mx-auto px-6">
                     <div className="grid grid-cols-1 md:grid-cols-4 gap-12 mb-16">
-                        <div className="col-span-2">
-                            <div className="mb-6">
-                                <SonarLogo size={36} />
-                            </div>
-                            <p className="text-sm text-slate-500 font-body mb-6 max-w-sm">
-                                Discover leads. Validate ideas. Save hours. <br />
-                                The ultimate intelligence platform for social selling.
-                            </p>
-                            <div className="flex items-center gap-4">
-                                <div className="w-8 h-8 rounded-lg bg-slate-900 border border-white/5 flex items-center justify-center text-slate-500 hover:text-white transition-colors cursor-pointer">
-                                    <Users size={16} />
+                        <div className="md:col-span-2 space-y-8">
+                            <div>
+                                <div className="mb-6">
+                                    <SonarLogo size={36} />
                                 </div>
-                                <div className="w-8 h-8 rounded-lg bg-slate-900 border border-white/5 flex items-center justify-center text-slate-500 hover:text-white transition-colors cursor-pointer" onClick={() => window.location.href = 'mailto:hello@sonarpro.app'}>
-                                    <MessageSquare size={16} />
+                                <p className="text-sm text-slate-500 font-body leading-relaxed max-w-sm">
+                                    Discover leads. Validate ideas. Save hours. <br />
+                                    The ultimate intelligence platform for social selling.
+                                </p>
+                            </div>
+                            <div className="flex items-center gap-4">
+                                <div className="w-10 h-10 rounded-xl bg-slate-900 border border-white/5 flex items-center justify-center text-slate-500 hover:text-indigo-400 hover:border-indigo-500/30 transition-all cursor-pointer shadow-inner group">
+                                    <Users size={18} className="group-hover:scale-110 transition-transform" />
+                                </div>
+                                <div className="w-10 h-10 rounded-xl bg-slate-900 border border-white/5 flex items-center justify-center text-slate-500 hover:text-indigo-400 hover:border-indigo-500/30 transition-all cursor-pointer shadow-inner group" onClick={() => window.location.href = 'mailto:hello@sonarpro.app'}>
+                                    <MessageSquare size={18} className="group-hover:scale-110 transition-transform" />
                                 </div>
                             </div>
                         </div>
 
-                        <div>
-                            <h4 className="text-xs font-black text-white uppercase tracking-widest mb-6">Roadmap</h4>
+                        <div className="md:pt-2"> {/* Column 3 */}
+                            <h4 className="text-xs font-black text-white uppercase tracking-[0.2em] mb-8">Product</h4>
                             <ul className="space-y-4">
-                                <li className="flex items-center gap-2 text-sm text-indigo-400 font-bold">
-                                    <div className="w-1.5 h-1.5 rounded-full bg-indigo-500 animate-pulse"></div>
-                                    Reddit (Live)
+                                <li><a href="#features" className="text-sm text-slate-500 hover:text-white transition-colors flex items-center gap-2">Features</a></li>
+                                <li><a href="#pricing" className="text-sm text-slate-500 hover:text-white transition-colors flex items-center gap-2">Pricing</a></li>
+                                <li>
+                                    <button
+                                        onClick={onSignIn}
+                                        className="text-sm text-slate-500 hover:text-white transition-colors flex items-center gap-2"
+                                    >
+                                        Sign In
+                                    </button>
                                 </li>
-                                <li className="text-sm text-slate-600 italic">Quora (Coming Soon)</li>
-                                <li className="text-sm text-slate-600 italic">G2 & Capterra</li>
-                                <li className="text-sm text-slate-600 italic">Indie Hackers</li>
                             </ul>
                         </div>
 
-                        <div>
-                            <h4 className="text-xs font-black text-white uppercase tracking-widest mb-6">Legal</h4>
+                        <div className="md:pt-2"> {/* Column 4 - Far Right */}
+                            <h4 className="text-xs font-black text-white uppercase tracking-[0.2em] mb-8">Roadmap</h4>
                             <ul className="space-y-4">
-                                <li><a href="#" className="text-sm text-slate-500 hover:text-white transition-colors">Terms of Service</a></li>
-                                <li><a href="#" className="text-sm text-slate-500 hover:text-white transition-colors">Privacy Policy</a></li>
-                                <li><a href="#" className="text-sm text-slate-500 hover:text-white transition-colors">Cookie Policy</a></li>
+                                <li className="flex items-center gap-3 text-sm text-indigo-400 font-bold">
+                                    <span className="w-1.5 h-1.5 rounded-full bg-indigo-500 shadow-[0_0_8px_rgba(99,102,241,0.6)] animate-pulse"></span>
+                                    Reddit (Live)
+                                </li>
+                                <li className="flex items-center gap-3 text-sm text-slate-600">
+                                    <span className="w-1 h-1 rounded-full bg-slate-800"></span>
+                                    Quora (Coming Soon)
+                                </li>
+                                <li className="flex items-center gap-3 text-sm text-slate-600">
+                                    <span className="w-1 h-1 rounded-full bg-slate-800"></span>
+                                    G2 & Capterra
+                                </li>
+                                <li className="flex items-center gap-3 text-sm text-slate-600">
+                                    <span className="w-1 h-1 rounded-full bg-slate-800"></span>
+                                    Indie Hackers
+                                </li>
                             </ul>
                         </div>
                     </div>
