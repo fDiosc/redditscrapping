@@ -18,7 +18,9 @@ dependencies = [
     "fastapi",
     "uvicorn",
     "python-jose[cryptography]",
-    "httpx"
+    "httpx",
+    "tiktoken",
+    "curl_cffi"
 ]
 
 [tool.setuptools]

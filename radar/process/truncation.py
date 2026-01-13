@@ -1,13 +1,18 @@
-import tiktoken
 from typing import List, Dict, Any
 
 def count_tokens(text: str, model: str = "gpt-4o-mini") -> int:
-    """Returns the number of tokens in a text string."""
+    """Returns the number of tokens, falls back to character count estimate if tiktoken fails."""
     try:
-        encoding = tiktoken.encoding_for_model(model)
-    except KeyError:
-        encoding = tiktoken.get_encoding("cl100k_base")
-    return len(encoding.encode(text))
+        import tiktoken
+        try:
+            encoding = tiktoken.encoding_for_model(model)
+        except KeyError:
+            encoding = tiktoken.get_encoding("cl100k_base")
+        return len(encoding.encode(text))
+    except Exception as e:
+        # Fallback for missing tiktoken or no internet on first load
+        # Average English word is ~4.5 chars, OpenAI says 1 token ~= 4 chars
+        return len(text) // 4
 
 def build_unified_context(post: Dict[str, Any], comments: List[Dict[str, Any]], max_tokens: int = 7500) -> str:
     """
