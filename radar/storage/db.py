@@ -64,25 +64,27 @@ def init_db():
     )
     """)
     
-    # Post Analysis table (per-product)
+    # Post Analysis table (per-product, per-user)
     cursor.execute("""
     CREATE TABLE IF NOT EXISTS post_analysis (
         post_id TEXT,
         product_id TEXT,
+        user_id TEXT,
         relevance_score REAL DEFAULT 0,
         semantic_similarity REAL DEFAULT 0,
         community_score REAL DEFAULT 0,
         ai_analysis TEXT,
         signals_json TEXT,
-        PRIMARY KEY (post_id, product_id),
+        PRIMARY KEY (post_id, product_id, user_id),
         FOREIGN KEY (post_id) REFERENCES posts(id)
     )
     """)
 
-    # Products table (Dynamic configuration)
+    # Products table (per-user)
     cursor.execute("""
     CREATE TABLE IF NOT EXISTS products (
-        id TEXT PRIMARY KEY,
+        id TEXT,
+        user_id TEXT NOT NULL,
         name TEXT NOT NULL,
         description TEXT NOT NULL,
         pain_signals TEXT NOT NULL,
@@ -91,14 +93,16 @@ def init_db():
         embedding_context TEXT,
         embedding_id TEXT,
         created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-        updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+        updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        PRIMARY KEY (id, user_id)
     )
     """)
 
-    # Sync runs history
+    # Sync runs history (per-user)
     cursor.execute("""
     CREATE TABLE IF NOT EXISTS sync_runs (
         id INTEGER PRIMARY KEY AUTOINCREMENT,
+        user_id TEXT,
         timestamp TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
         product TEXT,
         subreddits TEXT,
@@ -108,9 +112,11 @@ def init_db():
     )
     """)
     
+    # Generated responses (per-user)
     cursor.execute("""
     CREATE TABLE IF NOT EXISTS generated_responses (
         id TEXT PRIMARY KEY,
+        user_id TEXT NOT NULL,
         post_id TEXT NOT NULL,
         product_id TEXT NOT NULL,
         style TEXT NOT NULL DEFAULT 'empathetic',
@@ -118,8 +124,7 @@ def init_db():
         tokens_used INTEGER,
         created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
         feedback TEXT,
-        FOREIGN KEY (post_id) REFERENCES posts(id) ON DELETE CASCADE,
-        FOREIGN KEY (product_id) REFERENCES products(id) ON DELETE CASCADE
+        FOREIGN KEY (post_id) REFERENCES posts(id) ON DELETE CASCADE
     )
     """)
     conn.commit()
@@ -138,13 +143,30 @@ def init_db():
             conn.commit()
         except sqlite3.OperationalError:
             pass # Already exists
-    # User Settings table (for onboarding, etc.)
+    # User Settings table (per-user)
     cursor.execute("""
     CREATE TABLE IF NOT EXISTS user_settings (
-        key TEXT PRIMARY KEY,
-        value TEXT
+        user_id TEXT NOT NULL,
+        key TEXT NOT NULL,
+        value TEXT,
+        PRIMARY KEY (user_id, key)
     )
     """)
+    
+    # Migration: add user_id columns to existing tables
+    user_id_migrations = [
+        ("products", "user_id", "TEXT"),
+        ("post_analysis", "user_id", "TEXT"),
+        ("generated_responses", "user_id", "TEXT"),
+        ("sync_runs", "user_id", "TEXT"),
+    ]
+    for table, col_name, col_type in user_id_migrations:
+        try:
+            cursor.execute(f"ALTER TABLE {table} ADD COLUMN {col_name} {col_type}")
+            conn.commit()
+            print(f"DEBUG: Added {col_name} column to {table}")
+        except sqlite3.OperationalError:
+            pass  # Already exists
 
     conn.close()
 
@@ -168,6 +190,18 @@ def save_post(post_data: Dict[str, Any]):
     conn.commit()
     conn.close()
 
+def update_post_stats(post_id: str, score: int, num_comments: int):
+    """Surgical update for post metrics without overwriting body/content."""
+    conn = get_connection()
+    cursor = conn.cursor()
+    cursor.execute("""
+        UPDATE posts 
+        SET score = ?, num_comments = ?, scraped_at = CURRENT_TIMESTAMP
+        WHERE id = ?
+    """, (score, num_comments, post_id))
+    conn.commit()
+    conn.close()
+
 def save_comment(comment_data: Dict[str, Any]):
     conn = get_connection()
     cursor = conn.cursor()
@@ -187,15 +221,16 @@ def save_comment(comment_data: Dict[str, Any]):
     conn.commit()
     conn.close()
 
-def save_analysis(post_id: str, product_id: str, data: Dict[str, Any], cursor=None):
+def save_analysis(post_id: str, product_id: str, user_id: str, data: Dict[str, Any], cursor=None):
+    """Save post analysis for a specific user's product."""
     if cursor:
         cursor.execute("""
         INSERT OR REPLACE INTO post_analysis (
-            post_id, product_id, relevance_score, semantic_similarity, 
+            post_id, product_id, user_id, relevance_score, semantic_similarity, 
             community_score, ai_analysis, signals_json
-        ) VALUES (?, ?, ?, ?, ?, ?, ?)
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?)
         """, (
-            post_id, product_id, data.get('relevance_score', 0),
+            post_id, product_id, user_id, data.get('relevance_score', 0),
             data.get('semantic_similarity', 0), data.get('community_score', 0),
             data.get('ai_analysis'), data.get('signals_json')
         ))
@@ -204,11 +239,11 @@ def save_analysis(post_id: str, product_id: str, data: Dict[str, Any], cursor=No
         cur = conn.cursor()
         cur.execute("""
         INSERT OR REPLACE INTO post_analysis (
-            post_id, product_id, relevance_score, semantic_similarity, 
+            post_id, product_id, user_id, relevance_score, semantic_similarity, 
             community_score, ai_analysis, signals_json
-        ) VALUES (?, ?, ?, ?, ?, ?, ?)
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?)
         """, (
-            post_id, product_id, data.get('relevance_score', 0),
+            post_id, product_id, user_id, data.get('relevance_score', 0),
             data.get('semantic_similarity', 0), data.get('community_score', 0),
             data.get('ai_analysis'), data.get('signals_json')
         ))
@@ -224,11 +259,15 @@ def get_post(post_id: str):
     conn.close()
     return dict(row) if row else None
 
-def get_analysis(post_id: str, product_id: str):
+def get_analysis(post_id: str, product_id: str, user_id: str = None):
+    """Get analysis for a post. If user_id provided, filter by user."""
     conn = get_connection()
     conn.row_factory = sqlite3.Row
     cursor = conn.cursor()
-    cursor.execute("SELECT * FROM post_analysis WHERE post_id = ? AND product_id = ?", (post_id, product_id))
+    if user_id:
+        cursor.execute("SELECT * FROM post_analysis WHERE post_id = ? AND product_id = ? AND user_id = ?", (post_id, product_id, user_id))
+    else:
+        cursor.execute("SELECT * FROM post_analysis WHERE post_id = ? AND product_id = ?", (post_id, product_id))
     row = cursor.fetchone()
     conn.close()
     return dict(row) if row else None
@@ -291,13 +330,14 @@ def get_unprocessed_posts(subreddit_filter: List[str] = None, limit: int = None,
     conn.close()
     return [dict(row) for row in rows]
 
-def add_sync_run(product: str, subreddits: List[str], days: int):
+def add_sync_run(user_id: str, product: str, subreddits: List[str], days: int):
+    """Add a sync run record for a user."""
     conn = get_connection()
     cursor = conn.cursor()
     cursor.execute("""
-        INSERT INTO sync_runs (product, subreddits, days, status, progress)
-        VALUES (?, ?, ?, 'Running', 0)
-    """, (product, ', '.join(subreddits), days))
+        INSERT INTO sync_runs (user_id, product, subreddits, days, status, progress)
+        VALUES (?, ?, ?, ?, 'Running', 0)
+    """, (user_id, product, ', '.join(subreddits), days))
     run_id = cursor.lastrowid
     conn.commit()
     conn.close()
@@ -319,34 +359,47 @@ def get_comments(post_id: str):
     conn.close()
     return [dict(row) for row in rows]
 
-def get_sync_history(limit: int = 10):
+def get_sync_history(user_id: str = None, limit: int = 10):
+    """Get sync history. If user_id provided, filter by user."""
     conn = get_connection()
     conn.row_factory = sqlite3.Row
     cursor = conn.cursor()
-    cursor.execute("SELECT * FROM sync_runs ORDER BY timestamp DESC LIMIT ?", (limit,))
+    if user_id:
+        cursor.execute("SELECT * FROM sync_runs WHERE user_id = ? ORDER BY timestamp DESC LIMIT ?", (user_id, limit))
+    else:
+        cursor.execute("SELECT * FROM sync_runs ORDER BY timestamp DESC LIMIT ?", (limit,))
     rows = cursor.fetchall()
     conn.close()
     return [dict(row) for row in rows]
 
-def get_products() -> List[Dict[str, Any]]:
+def get_products(user_id: str = None) -> List[Dict[str, Any]]:
+    """Get products. If user_id provided, filter by user."""
     conn = get_connection()
     conn.row_factory = sqlite3.Row
     cursor = conn.cursor()
-    cursor.execute("SELECT * FROM products ORDER BY name ASC")
+    if user_id:
+        cursor.execute("SELECT * FROM products WHERE user_id = ? ORDER BY name ASC", (user_id,))
+    else:
+        cursor.execute("SELECT * FROM products ORDER BY name ASC")
     rows = cursor.fetchall()
     conn.close()
     return [dict(row) for row in rows]
 
-def get_product(product_id: str) -> Optional[Dict[str, Any]]:
+def get_product(product_id: str, user_id: str = None) -> Optional[Dict[str, Any]]:
+    """Get a product by ID. If user_id provided, filter by user."""
     conn = get_connection()
     conn.row_factory = sqlite3.Row
     cursor = conn.cursor()
-    cursor.execute("SELECT * FROM products WHERE id = ?", (product_id,))
+    if user_id:
+        cursor.execute("SELECT * FROM products WHERE id = ? AND user_id = ?", (product_id, user_id))
+    else:
+        cursor.execute("SELECT * FROM products WHERE id = ?", (product_id,))
     row = cursor.fetchone()
     conn.close()
     return dict(row) if row else None
 
 def save_product_record(product_data: Dict[str, Any]):
+    """Save a product record. Requires user_id in product_data."""
     conn = get_connection()
     cursor = conn.cursor()
     
@@ -365,11 +418,12 @@ def save_product_record(product_data: Dict[str, Any]):
 
     cursor.execute("""
     INSERT OR REPLACE INTO products (
-        id, name, description, pain_signals, intent_signals, 
+        id, user_id, name, description, pain_signals, intent_signals, 
         target_subreddits, embedding_context, embedding_id, updated_at
-    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP)
+    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP)
     """, (
         product_data['id'],
+        product_data['user_id'],
         product_data['name'],
         product_data['description'],
         pain_signals,
@@ -382,35 +436,38 @@ def save_product_record(product_data: Dict[str, Any]):
     conn.commit()
     conn.close()
 
-def delete_product(product_id: str):
+def delete_product(product_id: str, user_id: str):
+    """Delete a product for a specific user."""
     conn = get_connection()
     cursor = conn.cursor()
-    cursor.execute("DELETE FROM products WHERE id = ?", (product_id,))
+    cursor.execute("DELETE FROM products WHERE id = ? AND user_id = ?", (product_id, user_id))
     conn.commit()
     conn.close()
 
-def save_generated_response(post_id: str, product_id: str, style: str, response_text: str, tokens_used: int):
+def save_generated_response(user_id: str, post_id: str, product_id: str, style: str, response_text: str, tokens_used: int):
+    """Save a generated response for a user."""
     import uuid
     conn = get_connection()
     cursor = conn.cursor()
     response_id = str(uuid.uuid4())[:8]
     cursor.execute("""
-        INSERT INTO generated_responses (id, post_id, product_id, style, response_text, tokens_used)
-        VALUES (?, ?, ?, ?, ?, ?)
-    """, (response_id, post_id, product_id, style, response_text, tokens_used))
+        INSERT INTO generated_responses (id, user_id, post_id, product_id, style, response_text, tokens_used)
+        VALUES (?, ?, ?, ?, ?, ?, ?)
+    """, (response_id, user_id, post_id, product_id, style, response_text, tokens_used))
     conn.commit()
     conn.close()
     return response_id
 
-def get_generated_responses(post_id: str, product_id: str, limit: int = 5):
+def get_generated_responses(user_id: str, post_id: str, product_id: str, limit: int = 5):
+    """Get generated responses for a user's product."""
     conn = get_connection()
     conn.row_factory = sqlite3.Row
     cursor = conn.cursor()
     cursor.execute("""
         SELECT * FROM generated_responses 
-        WHERE post_id = ? AND product_id = ? 
+        WHERE user_id = ? AND post_id = ? AND product_id = ? 
         ORDER BY created_at DESC LIMIT ?
-    """, (post_id, product_id, limit))
+    """, (user_id, post_id, product_id, limit))
     rows = cursor.fetchall()
     conn.close()
     return [dict(row) for row in rows]
@@ -422,10 +479,11 @@ def update_response_feedback(response_id: str, feedback: str):
     conn.commit()
     conn.close()
 
-def get_user_setting(key: str, default: Any = None) -> Any:
+def get_user_setting(user_id: str, key: str, default: Any = None) -> Any:
+    """Get a user setting by key for a specific user."""
     conn = get_connection()
     cursor = conn.cursor()
-    cursor.execute("SELECT value FROM user_settings WHERE key = ?", (key,))
+    cursor.execute("SELECT value FROM user_settings WHERE user_id = ? AND key = ?", (user_id, key))
     row = cursor.fetchone()
     conn.close()
     if row:
@@ -435,10 +493,11 @@ def get_user_setting(key: str, default: Any = None) -> Any:
             return row[0]
     return default
 
-def save_user_setting(key: str, value: Any):
+def save_user_setting(user_id: str, key: str, value: Any):
+    """Save a user setting for a specific user."""
     conn = get_connection()
     cursor = conn.cursor()
     val_str = json.dumps(value) if not isinstance(value, str) else value
-    cursor.execute("INSERT OR REPLACE INTO user_settings (key, value) VALUES (?, ?)", (key, val_str))
+    cursor.execute("INSERT OR REPLACE INTO user_settings (user_id, key, value) VALUES (?, ?, ?)", (user_id, key, val_str))
     conn.commit()
     conn.close()

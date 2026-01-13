@@ -10,9 +10,18 @@ This document provides a 100% transparent view of how Radar operates, answering 
 *   **Quantity**: Radar currently ingests **all** comments loaded on the Reddit page. We removed the previous limit of 3 to capture the full community discussion.
 *   **Depth**: We scrape all visible comments on `old.reddit.com`. This includes nested replies (replies of replies) as long as they are rendered in the initial page view.
 
-### 1.2 Rate Limiting & Reliability
-*   **Reddit API**: Managed via `PRAW`. It respects the official Reddit rate limits (60 requests per minute) and handles retries with exponential backoff automatically.
-*   **Scraper Fallback**: Activated via the `--scraper` flag in CLI or automatically in the API if the main Reddit credentials fail. Currently, the scraper uses a 10-second timeout per request without explicit delay between subreddits.
+### 1.2 Anti-Ban Protection (Phase 1 MVP)
+The scraper includes comprehensive anti-ban measures:
+
+*   **User-Agent Rotation**: Pool of 7 modern browser User-Agents (Chrome, Firefox, Safari) rotated per request.
+*   **Complete Headers**: Full browser fingerprint including `Accept`, `Accept-Language`, `DNT`, `Sec-Fetch-*`, `Cache-Control`.
+*   **Rate Limiting with Jitter**: 
+    *   Base delay: 2-5 seconds between requests
+    *   Burst mode: 15% chance of 2.5x longer delay (simulates human distraction)
+    *   Micro-jitter: ±10% on all delays
+*   **Exponential Backoff**: On errors, delay doubles each retry (2s → 4s → 8s...) up to 60s max.
+*   **Retry Handler**: 3 automatic retries for 429, 5xx, and timeouts.
+*   **Adaptive Throttling**: On 429 (rate limit), future delays increase by 1.5x automatically.
 
 ### 1.3 Duplicates & Reposts
 *   **Deduplication**: We use the unique Reddit ID (e.g., `t3_xyz`). The database uses an `INSERT OR REPLACE` policy. If a post is ingested twice, it is updated (refreshing its score and comment count) rather than duplicated.
@@ -26,7 +35,8 @@ This document provides a 100% transparent view of how Radar operates, answering 
 ## 2. PROCESSING (The "Engine")
 
 ### 2.1 Unified Context & Smart Truncation
-*   **The Context**: We concatenate `Title + Body + [Top Comments]`.
+*   **The Context**: We concatenate `TITLE + AUTHOR + BODY + [COMMENT BY u/username]`.
+*   **Targeted Awareness**: Each piece of content is tagged with its author (Post Author vs. Commenter) to allow the AI to pinpoint the exact lead.
 *   **Smart Truncation**: We no longer rely on implicit LLM truncation. We use `tiktoken` to strictly manage the **8,192 token limit** (Target: 7,500 for safety).
 *   **Priority Logic**:
     1.  **Title**: Always included in full.
@@ -84,6 +94,8 @@ Radar uses a hybrid scoring system to rank leads.
 *   **Output Schema**:
     *   `pain_point_summary`: Concise summary of the user's struggle.
     *   `pain_quote`: Direct snippet from the thread.
+    *   `pain_author`: Username of the specific lead who expressed the pain.
+    *   `is_from_comment`: boolean (true if the lead is a commenter, false if the post author).
     *   `urgency`: High/Medium/Low.
     *   `product_relevance`: 1-10 numeric score.
     *   `relevance_explanation`: Rationale for the match.
@@ -99,10 +111,19 @@ Radar uses a hybrid scoring system to rank leads.
 ## 5. STORAGE & INFRASTRUCTURE
 
 ### 5.1 Database Schema (SQLite)
+
+The database uses a **multi-tenant architecture** where Reddit content is shared globally, but user-specific data is isolated by `user_id` (Clerk's unique identifier).
+
+#### Global Tables (Shared)
 *   **Posts**: `id, title, body, author, score, num_comments, embedding_id, last_processed_score, last_processed_comments`.
 *   **Comments**: `id, post_id, body, author, score, depth`.
-*   **Products**: `id, name, description, pain_signals, intent_signals, target_subreddits, embedding_context`.
-*   **Post_Analysis**: Stores per-product relevance scores and the **structured JSON** AI analysis.
+
+#### Per-User Tables (Isolated by `user_id`)
+*   **Products**: `id, user_id, name, description, pain_signals, intent_signals, target_subreddits, embedding_context`.
+*   **Post_Analysis**: `post_id, product_id, user_id, relevance_score, semantic_similarity, community_score, ai_analysis, signals_json` - per-user analysis of shared posts.
+*   **Generated_Responses**: `id, user_id, post_id, product_id, style, response_text, tokens_used, feedback` - AI-generated replies.
+*   **Sync_Runs**: `id, user_id, timestamp, product, subreddits, status, progress` - per-user sync history.
+*   **User_Settings**: `user_id, key, value` - per-user preferences (onboarding state, etc.).
 
 ### 5.2 Storage Size
 *   **Current State**: ~500KB for ~30-50 posts.
@@ -112,6 +133,39 @@ Radar uses a hybrid scoring system to rank leads.
 ### 5.3 Vector Database (ChromaDB)
 *   **Mode**: Persistent on disk at `data/chroma`.
 *   **Function**: Stores embeddings and allows semantic similarity lookups.
+*   **Scope**: Global (embeddings are shared across users).
+
+---
+
+## 5A. AUTHENTICATION & AUTHORIZATION
+
+### 5A.1 Clerk Integration
+*   **Frontend**: Uses `@clerk/clerk-react` with `ClerkProvider` wrapping the app.
+*   **Backend**: JWT verification via `radar/api/auth.py`.
+*   **Token Flow**: Frontend calls `getToken()` and includes `Authorization: Bearer <token>` header on all API requests.
+
+### 5A.2 API Endpoint Protection
+
+| Endpoint | Auth | Scope |
+|----------|------|-------|
+| `GET /config` | ✅ Required | Returns user's products and subreddits |
+| `GET /threads` | ✅ Required | Returns user's analysis for a product |
+| `POST /sync` | ✅ Required | Triggers sync for user's products |
+| `GET /sync/status` | ❌ Public | Returns current sync state |
+| `GET /sync/history` | ✅ Required | Returns user's sync runs |
+| `GET /api/products` | ✅ Required | Lists user's products |
+| `GET /api/products/{id}` | ✅ Required | Gets user's specific product |
+| `POST /api/products` | ✅ Required | Creates product for user |
+| `PUT /api/products/{id}` | ✅ Required | Updates user's product |
+| `DELETE /api/products/{id}` | ✅ Required | Deletes user's product |
+| `GET /threads/{id}/comments` | ❌ Public | Shared Reddit comments |
+| `POST /api/responses/generate/{id}` | ✅ Required | Generates response for user |
+| `GET /api/responses/history/{id}` | ✅ Required | User's response history |
+| `POST /api/responses/{id}/feedback` | ❌ Public | Submit feedback (id-based) |
+| `GET /api/settings/{key}` | ✅ Required | User's setting value |
+| `POST /api/settings` | ✅ Required | Save user setting |
+| `GET /reports` | ❌ Public | List available reports |
+| `GET /reports/download/{file}` | ❌ Public | Download report file |
 
 ---
 
@@ -145,9 +199,11 @@ Radar allows you to generate reports using three distinct calibration modes. The
 *   **API**: FastAPI (Python) backend using Uvicorn.
 
 ### 7.2 Views
-*   **Discovery Dashboard**: The main Lead-focused view. Includes semantic sorting (Relevance vs Intensity), thread expansion, and the **Structured AI Insight Card**.
+*   **Discovery Dashboard**: The main Lead-focused view. Includes semantic sorting (Relevance vs Intensity) and the **Interactive Stats Grid**.
+*   **Interactive Filtering**: Clickable stat cards (High Fit, High Score, High Intensity) that instantly filter and re-sort the lead list.
+*   **AI Insight Card**: Displays detailed analysis including the "Signal Source" (Author vs Commenter) and targeted response options.
+*   **Onboarding Wizard**: A discovery tour to guide new users through the dashboard's core metrics and features.
 *   **Product Settings**: A dedicated configuration view. Allows CRUD operations (Create, Read, Update, Delete) on products.
-*   **Product Modal**: Interactive form with dynamic tag management for Pain/Intent signals and Subreddits.
 
 ### 7.2 Data Fetching
 *   **Sync Status**: Polled every 1s from the frontend to show live progress bars and current processing steps.
@@ -178,3 +234,24 @@ Radar has successfully migrated from hardcoded constants (`products.py`) to a fu
 *   **NSFW**: Not filtered by default (Business subreddits are rarely NSFW).
 *   **Bots**: We use community scores to naturally de-prioritize bot posts (they usually have low Fit/Intensity).
 *   **AI Failure**: If OpenAI fails, the post is saved without embedding/score and will be retried on the next `process` run.
+
+---
+
+## 10. PROFILE INTELLIGENCE (RGIG Phase 1)
+
+Radar now includes a high-reasoning response generation engine to facilitate direct social selling.
+
+### 10.1 Flagship Integration (GPT-5.2)
+*   **Model**: Utilizing the flagship `gpt-5.2` model for all response generations.
+*   **Reasoning Effort**: Fixed at `xhigh`. This ensures the AI deeply understands the nuances of Reddit culture, avoids spammy patterns, and creates logical connections between the user's pain and the solution.
+*   **Context Layer**: The generator receives the "Target User" metadata (`pain_author`) and "Source Location" (`is_from_comment`) to ensure the reply is context-correct.
+
+### 10.2 Targeted Reply Logic
+*   **Recipient Awareness**:
+    *   **Post Replies**: Tone is general and addresses the thread's core topic.
+    *   **Comment Replies**: Tone is specific and directly replies to the commenter, acknowledging their unique perspective.
+*   **Safety Constraints**: The "Reddit Community Member" system prompt strictly forbids direct mentions of the product name or marketing buzzwords, ensuring 100% human-like delivery.
+
+### 10.3 Feedback & Iteration
+*   **The Loop**: User feedback (Thumbs Up/Down) is saved in the `generated_responses` table.
+*   **Styles**: Supports 5 distinct presets (`empathetic`, `helpful_expert`, `casual`, `technical`, `brief`) to match different community vibes.

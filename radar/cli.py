@@ -45,7 +45,7 @@ def ingest(subreddit: str = None, days: int = 7, scraper: bool = False):
         console.print(f"[green]✓ Ingested {count} posts from r/{sub}.[/green]")
 
 @app.command()
-def process(ai_analyze: bool = False, batch: int = 50, target_product: str = None, subreddit_filter: List[str] = None, limit: int = None, force: bool = False):
+def process(ai_analyze: bool = False, batch: int = 50, target_product: str = None, subreddit_filter: List[str] = None, limit: int = None, force: bool = False, user_id: str = None):
     """Process pending posts: generate embeddings, semantic fit, and signals."""
     from radar.storage.db import get_unprocessed_posts, get_connection
     from radar.process.embeddings import get_embeddings
@@ -53,7 +53,7 @@ def process(ai_analyze: bool = False, batch: int = 50, target_product: str = Non
     from radar.process.ai_analysis import analyze_post_with_ai
     from radar.process.semantic import SemanticEngine
     from radar.storage.vectors import get_or_create_collection, add_embeddings
-    from radar.products import AI_ANALYSIS_THRESHOLD
+    from radar.config import AI_ANALYSIS_THRESHOLD
     import json
     
     posts = get_unprocessed_posts(subreddit_filter=subreddit_filter, limit=limit, force=force)
@@ -66,7 +66,7 @@ def process(ai_analyze: bool = False, batch: int = 50, target_product: str = Non
         console.print(f"Target Product for AI Analysis: [cyan]{target_product}[/cyan]")
     
     # Initialize Engines
-    engine = SemanticEngine()
+    engine = SemanticEngine(user_id=user_id)
     collection = get_or_create_collection()
     conn = get_connection()
     cursor = conn.cursor()
@@ -100,35 +100,56 @@ def process(ai_analyze: bool = False, batch: int = 50, target_product: str = Non
             
         # 3. Hybrid Analysis
         from radar.storage.db import save_analysis, get_products
-        available_products = get_products()
+        available_products = get_products(user_id=user_id)
         
         for post, unified_text, emb in zip(current_batch, batch_texts, embeddings):
             signals = detect_signals(unified_text, available_products=available_products)
             community_score = calculate_intensity(post)
             
             # Analyze for ALL products found in DB
+            from radar.config import SCORING_CONFIG, AI_TRIGGER_CONFIG, AI_ANALYSIS_THRESHOLD
+            
             for p_rec in available_products:
                 product_key = p_rec['id']
-                similarity = engine.get_product_fit(emb, product_key)
-                intent_bonus = classify_relevance(post, signals)
+                similarity = engine.get_product_fit(emb, product_key, p_rec['user_id'])
                 
-                # Formula: (Similarity * 15) + Intent + Community
-                relevance = (similarity * 15.0) + intent_bonus + community_score
+                # --- STRUCTURAL RELEVANCE GATING ---
+                # Gate: Only apply intent bonus if there's a specific keyword match OR baseline semantic fit
+                min_baseline = SCORING_CONFIG['structural_gating']['min_semantic_fit']
+                
+                has_product_context = (
+                    len(signals['product_matches'].get(product_key, {}).get('pain_points', [])) > 0 or
+                    len(signals['product_matches'].get(product_key, {}).get('intents', [])) > 0
+                )
+                
+                if has_product_context or similarity >= min_baseline:
+                    intent_bonus = classify_relevance(post, signals)
+                else:
+                    intent_bonus = 0.0 # Block inflated bonuses for irrelevant posts
+                
+                # Formula: (Similarity * Multiplier) + Intent + Community
+                sim_multiplier = SCORING_CONFIG['relevance_weights']['semantic_multiplier']
+                relevance = (similarity * sim_multiplier) + intent_bonus + community_score
                 
                 ai_result = None
-                # Step 5: Efficient AI Triggering (Minimum Fit Threshold)
-                AI_MINIMUM_FIT = 0.4
+                # Step 5: Efficient AI Triggering (Minimum Fit Threshold + High-Relevance Bypass)
+                min_fit = AI_TRIGGER_CONFIG['min_semantic_fit']
+                bypass = AI_TRIGGER_CONFIG['high_relevance_bypass']
                 
-                should_ai_analyze = ai_analyze and relevance >= AI_ANALYSIS_THRESHOLD and similarity >= AI_MINIMUM_FIT
+                should_ai_analyze = ai_analyze and (
+                    (relevance >= AI_ANALYSIS_THRESHOLD and similarity >= min_fit) or
+                    (relevance >= bypass)
+                )
+                
                 if target_product and product_key != target_product:
                     should_ai_analyze = False
                 
                 if should_ai_analyze:
-                    console.print(f"  [cyan]AI Analyzing for {product_key}: {post['title'][:40]}... (Sim: {similarity:.2f})[/cyan]")
+                    console.print(f"  [cyan]AI Analyzing for {product_key}: {post['title'][:40]}... (Sim: {similarity:.2f} | Score: {relevance:.1f})[/cyan]")
                     ai_result = analyze_post_with_ai(unified_text, p_rec)
                 
                 # Save to specific analysis table
-                save_analysis(post['id'], product_key, {
+                save_analysis(post['id'], product_key, p_rec['user_id'], {
                     "relevance_score": relevance,
                     "semantic_similarity": similarity,
                     "community_score": community_score,
@@ -156,7 +177,7 @@ def report(product: str, mode: str = "DIRECT_FIT", limit: int = 15):
     """Generate a calibrated report using different discovery modes."""
     from radar.storage.db import get_connection
     import pandas as pd
-    from radar.products import AI_ANALYSIS_THRESHOLD
+    from radar.config import AI_ANALYSIS_THRESHOLD
     
     console.print(f"Generating [bold]{mode}[/bold] report for [bold]{product}[/bold]...")
     from radar.storage.db import get_product

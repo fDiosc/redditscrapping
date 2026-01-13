@@ -61,22 +61,52 @@ PRODUCT_SIGNALS = {
             "shopify profit", "profit margin", "losing money",
             "cogs tracking", "true profit", "shipping costs eating",
             "don't know if profitable", "spreadsheet nightmare",
-            "fulfillment", "checkout", "orders", "customer", "selling"
+            "fulfillment", "checkout", "orders", "customer", "selling",
+            "margins", "revenue", "costs", "pricing", "analytics", "roi", "cogs"
         ],
         "intent": ["profit calculator", "profit tracker", "profit app shopify", "analytics"]
     },
     "socialgenius": {
         "pain": [
             "content ideas", "what to post", "posting schedule",
-            "social media burnout", "creating content takes forever"
+            "social media burnout", "creating content takes forever",
+            "reels", "tiktok", "instagram", "schedule", "captions", "hashtags",
+            "engagement", "followers", "creator", "influencer", "content calendar"
         ],
-        "intent": ["content generator", "social media tool", "instagram scheduler"]
+        "intent": ["content generator", "social media tool", "instagram scheduler", "post on ig", "run my tiktok"]
     },
     "promptlocker": {
         "pain": [
             "organize prompts", "lost my prompt", "reuse prompts",
-            "prompt library", "save prompts", "prompt chaos"
+            "prompt library", "save prompts", "prompt chaos",
+            "chatgpt", "claude", "midjourney", "llm", "versioning"
         ],
         "intent": ["prompt manager", "prompt organizer", "prompt library", "prompt vault"]
     }
 }
+
+# Scoring and Trigger Configuration
+SCORING_CONFIG = {
+    "intent_weights": {
+        "seeking_tool": 5.0,
+        "complaint": 3.0,
+        "comparison": 2.0
+    },
+    "structural_gating": {
+        "min_semantic_fit": 0.50,
+        "require_product_context": True
+    },
+    "relevance_weights": {
+        "semantic_multiplier": 15.0,
+        "intensity_multiplier": 1.0 # Derived from log values
+    }
+}
+
+AI_TRIGGER_CONFIG = {
+    "min_relevance_score": 7.0,
+    "min_semantic_fit": 0.40,
+    "high_relevance_bypass": 15.0
+}
+
+# For backward compatibility and ease of import
+AI_ANALYSIS_THRESHOLD = AI_TRIGGER_CONFIG["min_relevance_score"]

@@ -18,7 +18,7 @@ def build_unified_context(post: Dict[str, Any], comments: List[Dict[str, Any]], 
     body = post.get('body', '')
     
     # 1. Reserve space for Title and basic structure
-    header = f"TITLE: {title}\n"
+    header = f"TITLE: {title}\nAUTHOR: {post.get('author', 'unknown')}\n"
     body_header = "BODY: "
     comments_header = "\n\nCOMMUNITY COMMENTS:\n"
     
@@ -43,7 +43,7 @@ def build_unified_context(post: Dict[str, Any], comments: List[Dict[str, Any]], 
     # 3. Add Comments (Sorted by score)
     comments_included = 0
     for cmd in comments:
-        cmd_text = f"- {cmd['body']}\n"
+        cmd_text = f"COMMENT BY u/{cmd.get('author', 'unknown')}: {cmd['body']}\n"
         cmd_tokens = count_tokens(cmd_text)
         
         if current_tokens + cmd_tokens > max_tokens:

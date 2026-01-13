@@ -70,14 +70,15 @@ class ResponseGenerator:
     def __init__(self):
         self.client = openai.OpenAI(api_key=OPENAI_API_KEY)
 
-    def generate_response(self, post_id: str, product_id: str, style: str = "empathetic") -> Dict[str, Any]:
+    def generate_response(self, user_id: str, post_id: str, product_id: str, style: str = "empathetic") -> Dict[str, Any]:
+        """Generate a response for a user's product."""
         post = get_post(post_id)
         if not post:
             raise ValueError(f"Post {post_id} not found")
         
-        product = get_product(product_id)
+        product = get_product(product_id, user_id)
         if not product:
-            raise ValueError(f"Product {product_id} not found")
+            raise ValueError(f"Product {product_id} not found for this user")
             
         analysis = get_analysis(post_id, product_id)
         if analysis and isinstance(analysis.get('ai_analysis'), str):
@@ -100,13 +101,20 @@ Post Content:
 {post['body'][:800] if post.get('body') else '(no body)'}
 
 ---
-## What We Know About This Person
+---
+## Context for the Response
+Target User: u/{ai_data.get('pain_author', 'unknown')}
+Source Location: {"Comment" if ai_data.get('is_from_comment') else "Main Post"}
 Their Core Struggle: {ai_data.get('pain_point_summary', 'Not specified')}
 Their Exact Words: "{ai_data.get('pain_quote', 'Not available')}"
 
 ---
 ## Style Instructions
 {style_mod}
+
+## CRITICAL: RECIPIENT AWARENESS
+If the source is a "Comment", write the response as a direct reply to u/{ai_data.get('pain_author', 'unknown')}. Acknowledge that you saw their specific comment in the thread. 
+If the source is the "Main Post", address the original author's post.
 
 Write the response now (plain text, no markdown formatting):"""
 
@@ -127,7 +135,7 @@ Write the response now (plain text, no markdown formatting):"""
             
             tokens_used = response.usage.total_tokens
             
-            res_id = save_generated_response(post_id, product_id, style, response_text, tokens_used)
+            res_id = save_generated_response(user_id, post_id, product_id, style, response_text, tokens_used)
             
             return {
                 "id": res_id,

@@ -21,4 +21,4 @@ PRODUCTS = {
     }
 }
 
-AI_ANALYSIS_THRESHOLD = 7.0 # Min relevance score to trigger AI analysis
+

@@ -31,36 +31,38 @@ def generate_product_context(product: Dict[str, Any]) -> str:
     return context.strip()
 
 class SemanticEngine:
-    def __init__(self):
-        self.product_embeddings = {}
-        self._initialize_products()
+    def __init__(self, user_id: str = None):
+        self.product_embeddings = {} # Key: (user_id, product_id)
+        self._initialize_products(user_id)
 
-    def _initialize_products(self):
-        """Pre-calculate embeddings for all products from the database."""
+    def _initialize_products(self, user_id: str = None):
+        """Pre-calculate embeddings for products. If user_id is None, fetches all."""
         from radar.storage.db import get_products
         
-        products = get_products()
+        products = get_products(user_id=user_id)
         for product in products:
+            p_user_id = product['user_id']
+            p_id = product['id']
+            
             # Generate rich context
             text = generate_product_context(product)
             
-            # Save the context back to the DB record if it changed (optional but helpful)
             # For now, just generate the embedding
             emb = get_embeddings([text])[0]
-            self.product_embeddings[product['id']] = emb
+            self.product_embeddings[(p_user_id, p_id)] = emb
 
-    def refresh_product(self, product_id: str):
+    def refresh_product(self, product_id: str, user_id: str):
         """Regenerate and cache the embedding for a specific product."""
         from radar.storage.db import get_product
-        product = get_product(product_id)
+        product = get_product(product_id, user_id=user_id)
         if product:
             text = generate_product_context(product)
             emb = get_embeddings([text])[0]
-            self.product_embeddings[product_id] = emb
+            self.product_embeddings[(user_id, product_id)] = emb
 
-    def get_product_fit(self, post_embedding: List[float], product_key: str) -> float:
+    def get_product_fit(self, post_embedding: List[float], product_key: str, user_id: str) -> float:
         """Get similarity score between a post and a specific product."""
-        product_emb = self.product_embeddings.get(product_key)
+        product_emb = self.product_embeddings.get((user_id, product_key))
         if not product_emb:
             return 0.0
         return calculate_similarity(post_embedding, product_emb)

@@ -21,6 +21,8 @@ def analyze_post_with_ai(unified_text: str, product_rec: Dict[str, Any]) -> str:
     {
         "pain_point_summary": "1-2 sentence summary of the core problem",
         "pain_quote": "Exact short quote from the thread that confirms the struggle",
+        "pain_author": "Username of the person who expressed the pain (exclude u/ prefix)",
+        "is_from_comment": true/false (true if the pain was found in a comment, false if in the main post title or body),
         "urgency": "High/Medium/Low",
         "product_relevance": 1-10 (Numeric),
         "relevance_explanation": "Why this product helps this specific user",
