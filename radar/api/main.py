@@ -39,7 +39,7 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-@app.get("/config")
+@app.get("/api/config")
 async def get_config(user_id: str = Depends(get_current_user)):
     from radar.storage.db import get_products
     products = get_products(user_id)
@@ -58,7 +58,7 @@ async def get_config(user_id: str = Depends(get_current_user)):
         "subreddits": sorted(list(all_subs))
     }
 
-@app.get("/threads")
+@app.get("/api/threads")
 async def get_threads(user_id: str = Depends(get_current_user), product: str = None, limit: int = 50):
     conn = get_connection()
     conn.row_factory = lambda cursor, row: dict(zip([col[0] for col in cursor.description], row))
@@ -125,21 +125,21 @@ SYNC_STATE = {
     "progress": 0
 }
 
-@app.get("/sync/status")
+@app.get("/api/sync/status")
 async def get_sync_status():
     return SYNC_STATE
 
-@app.get("/threads/{post_id}/comments")
+@app.get("/api/threads/{post_id}/comments")
 async def get_post_comments(post_id: str):
     from radar.storage.db import get_comments
     return get_comments(post_id)
 
-@app.get("/sync/history")
+@app.get("/api/sync/history")
 async def get_sync_history_api(user_id: str = Depends(get_current_user), limit: int = 10):
     from radar.storage.db import get_sync_history
     return get_sync_history(user_id, limit)
 
-@app.post("/sync")
+@app.post("/api/sync")
 async def sync_data(
     background_tasks: BackgroundTasks,
     user_id: str = Depends(get_current_user),
@@ -277,7 +277,7 @@ async def delete_product_api(product_id: str, user_id: str = Depends(get_current
     delete_product(product_id, user_id)
     return {"status": "deleted"}
 
-@app.get("/reports/download/{filename}")
+@app.get("/api/reports/download/{filename}")
 async def download_report(filename: str):
     from fastapi.responses import FileResponse
     path = os.path.join("outputs/reports", filename)
@@ -285,7 +285,7 @@ async def download_report(filename: str):
         return FileResponse(path)
     return {"error": "File not found"}
 
-@app.get("/reports")
+@app.get("/api/reports")
 async def list_reports():
     reports_dir = "outputs/reports"
     if not os.path.exists(reports_dir):
