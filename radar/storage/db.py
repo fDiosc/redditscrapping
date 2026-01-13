@@ -69,12 +69,13 @@ def init_db():
     CREATE TABLE IF NOT EXISTS post_analysis (
         post_id TEXT,
         product_id TEXT,
-        user_id TEXT,
+        user_id TEXT DEFAULT 'default_user',
         relevance_score REAL DEFAULT 0,
         semantic_similarity REAL DEFAULT 0,
         community_score REAL DEFAULT 0,
         ai_analysis TEXT,
         signals_json TEXT,
+        updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
         PRIMARY KEY (post_id, product_id, user_id),
         FOREIGN KEY (post_id) REFERENCES posts(id)
     )
@@ -129,20 +130,43 @@ def init_db():
     """)
     conn.commit()
     
-    # Migration: add new columns if missing
+    # Migration: add new columns if missing to post_analysis
     columns = [
         ("ai_analysis", "TEXT"),
         ("semantic_similarity", "REAL DEFAULT 0"),
         ("community_score", "REAL DEFAULT 0"),
         ("last_processed_score", "INTEGER DEFAULT -1"),
-        ("last_processed_comments", "INTEGER DEFAULT -1")
+        ("last_processed_comments", "INTEGER DEFAULT -1"),
+        ("triage_status", "TEXT"), # 'agree', 'disagree', NULL
+        ("triage_at", "TIMESTAMP"),
+        ("triage_relevance_snapshot", "REAL"),
+        ("triage_semantic_snapshot", "REAL"),
+        ("updated_at", "TIMESTAMP DEFAULT CURRENT_TIMESTAMP")
     ]
     for col_name, col_type in columns:
         try:
-            cursor.execute(f"ALTER TABLE posts ADD COLUMN {col_name} {col_type}")
+            cursor.execute(f"ALTER TABLE post_analysis ADD COLUMN {col_name} {col_type}")
             conn.commit()
         except sqlite3.OperationalError:
             pass # Already exists
+
+    # Triage History (per-user/product/post feedback log)
+    cursor.execute("""
+    CREATE TABLE IF NOT EXISTS triage_history (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        post_id TEXT NOT NULL,
+        product_id TEXT NOT NULL,
+        user_id TEXT NOT NULL,
+        status TEXT NOT NULL,
+        relevance_score REAL,
+        semantic_similarity REAL,
+        community_score REAL,
+        ai_analysis_snapshot TEXT,
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        FOREIGN KEY (post_id) REFERENCES posts(id)
+    )
+    """)
+    conn.commit()
     # User Settings table (per-user)
     cursor.execute("""
     CREATE TABLE IF NOT EXISTS user_settings (
@@ -222,33 +246,71 @@ def save_comment(comment_data: Dict[str, Any]):
     conn.close()
 
 def save_analysis(post_id: str, product_id: str, user_id: str, data: Dict[str, Any], cursor=None):
-    """Save post analysis for a specific user's product."""
+    """Save post analysis for a specific user's product. Preserves triage status on update."""
+    query = """
+    INSERT INTO post_analysis (
+        post_id, product_id, user_id, relevance_score, semantic_similarity, 
+        community_score, ai_analysis, signals_json, updated_at
+    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP)
+    ON CONFLICT(post_id, product_id, user_id) DO UPDATE SET
+        relevance_score = excluded.relevance_score,
+        semantic_similarity = excluded.semantic_similarity,
+        community_score = excluded.community_score,
+        ai_analysis = excluded.ai_analysis,
+        signals_json = excluded.signals_json,
+        updated_at = CURRENT_TIMESTAMP
+    """
+    params = (
+        post_id, product_id, user_id, data.get('relevance_score', 0),
+        data.get('semantic_similarity', 0), data.get('community_score', 0),
+        data.get('ai_analysis'), data.get('signals_json')
+    )
+    
     if cursor:
-        cursor.execute("""
-        INSERT OR REPLACE INTO post_analysis (
-            post_id, product_id, user_id, relevance_score, semantic_similarity, 
-            community_score, ai_analysis, signals_json
-        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?)
-        """, (
-            post_id, product_id, user_id, data.get('relevance_score', 0),
-            data.get('semantic_similarity', 0), data.get('community_score', 0),
-            data.get('ai_analysis'), data.get('signals_json')
-        ))
+        cursor.execute(query, params)
     else:
         conn = get_connection()
         cur = conn.cursor()
-        cur.execute("""
-        INSERT OR REPLACE INTO post_analysis (
-            post_id, product_id, user_id, relevance_score, semantic_similarity, 
-            community_score, ai_analysis, signals_json
-        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?)
-        """, (
-            post_id, product_id, user_id, data.get('relevance_score', 0),
-            data.get('semantic_similarity', 0), data.get('community_score', 0),
-            data.get('ai_analysis'), data.get('signals_json')
-        ))
+        cur.execute(query, params)
         conn.commit()
         conn.close()
+
+def update_triage_status(user_id: str, product_id: str, post_id: str, status: str):
+    """Update triage status and record snapshots/history."""
+    conn = get_connection()
+    cursor = conn.cursor()
+    
+    # 1. Fetch current metrics and AI analysis for snapshot
+    cursor.execute("""
+        SELECT relevance_score, semantic_similarity, community_score, ai_analysis
+        FROM post_analysis
+        WHERE post_id = ? AND product_id = ? AND user_id = ?
+    """, (post_id, product_id, user_id))
+    current = cursor.fetchone()
+    
+    if current:
+        rel, sem, com, ai = current
+        # 2. Update post_analysis with status and snapshots
+        cursor.execute("""
+            UPDATE post_analysis 
+            SET triage_status = ?, 
+                triage_at = CURRENT_TIMESTAMP, 
+                updated_at = CURRENT_TIMESTAMP,
+                triage_relevance_snapshot = ?,
+                triage_semantic_snapshot = ?
+            WHERE post_id = ? AND product_id = ? AND user_id = ?
+        """, (status, rel, sem, post_id, product_id, user_id))
+        
+        # 3. Log into triage_history for future AI training
+        cursor.execute("""
+            INSERT INTO triage_history (
+                post_id, product_id, user_id, status, 
+                relevance_score, semantic_similarity, community_score, ai_analysis_snapshot
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+        """, (post_id, product_id, user_id, status, rel, sem, com, ai))
+        
+    conn.commit()
+    conn.close()
 
 def get_post(post_id: str):
     conn = get_connection()

@@ -1,0 +1,117 @@
+
+
+### IRRELEVANT (Noise) ###
+
+================================================================================
+DEBUGGING POST: What makes a marketer more hireable - industry specialization or technical skills?
+ID: t3_1q97dvq
+================================================================================
+1. SEMANTIC FIT: 39.8%
+   Contribution: 5.97 (multiplier: 15.0)
+2. COMMUNITY INTENSITY: 6.33
+   (Reddit Score: 30, Comments: 40)
+3. SIGNALS AND GATING:
+   Detected Intents: []
+   Product Keywords Matched: {'pain_points': [], 'intents': []}
+   Has Product Context? NO
+   Similarity >= New Baseline (0.5)? NO (0.40)
+   GATE STATUS -> Intent Bonus blocked: 0.0 (Reason: No context and Similarity < 0.5)
+
+FINAL CALCULATED SCORE: 12.30
+STORED SCORE IN DB: 12.30
+
+================================================================================
+DEBUGGING POST: Made $100k with my SaaS in 12 months. Here’s what worked and what didn't
+ID: t3_1q96fy4
+================================================================================
+1. SEMANTIC FIT: 46.6%
+   Contribution: 7.00 (multiplier: 15.0)
+2. COMMUNITY INTENSITY: 6.85
+   (Reddit Score: 52, Comments: 50)
+3. SIGNALS AND GATING:
+   Detected Intents: ['seeking_tool']
+   Product Keywords Matched: {'pain_points': [], 'intents': []}
+   Has Product Context? NO
+   Similarity >= New Baseline (0.5)? NO (0.47)
+   GATE STATUS -> Intent Bonus blocked: 0.0 (Reason: No context and Similarity < 0.5)
+
+FINAL CALCULATED SCORE: 13.84
+STORED SCORE IN DB: 13.84
+
+================================================================================
+DEBUGGING POST: Don't skip validating your ideas, its the worst
+ID: t3_1q8k3uh
+================================================================================
+1. SEMANTIC FIT: 43.0%
+   Contribution: 6.44 (multiplier: 15.0)
+2. COMMUNITY INTENSITY: 6.54
+   (Reddit Score: 20, Comments: 54)
+3. SIGNALS AND GATING:
+   Detected Intents: ['complaint']
+   Product Keywords Matched: {'pain_points': [], 'intents': []}
+   Has Product Context? NO
+   Similarity >= New Baseline (0.5)? NO (0.43)
+   GATE STATUS -> Intent Bonus blocked: 0.0 (Reason: No context and Similarity < 0.5)
+
+FINAL CALCULATED SCORE: 12.99
+STORED SCORE IN DB: 12.99
+
+
+### TRICKY NOISE (Comment Match) ###
+
+================================================================================
+DEBUGGING POST: Reminder: Your project doesn’t need to be finished to be interesting.
+ID: t3_1q8a99r
+================================================================================
+1. SEMANTIC FIT: 44.1%
+   Contribution: 6.62 (multiplier: 15.0)
+2. COMMUNITY INTENSITY: 7.16
+   (Reddit Score: 28, Comments: 78)
+3. SIGNALS AND GATING:
+   Detected Intents: []
+   Product Keywords Matched: {'pain_points': [], 'intents': []}
+   Has Product Context? NO
+   Similarity >= New Baseline (0.5)? NO (0.44)
+   GATE STATUS -> Intent Bonus blocked: 0.0 (Reason: No context and Similarity < 0.5)
+
+FINAL CALCULATED SCORE: 13.77
+STORED SCORE IN DB: 13.77
+
+
+### RELEVANT (True Leads) ###
+
+================================================================================
+DEBUGGING POST: Want to hire someone to run my IG/TIKTOK
+ID: t3_1q9xv0c
+================================================================================
+1. SEMANTIC FIT: 52.5%
+   Contribution: 7.88 (multiplier: 15.0)
+2. COMMUNITY INTENSITY: 6.11
+   (Reddit Score: 19, Comments: 39)
+3. SIGNALS AND GATING:
+   Detected Intents: ['seeking_tool']
+   Product Keywords Matched: {'pain_points': ['captions'], 'intents': ['hire someone to run my']}
+   Has Product Context? YES
+   Similarity >= New Baseline (0.5)? YES (0.53)
+   GATE STATUS -> Intent Bonus applied: +5.0
+
+FINAL CALCULATED SCORE: 18.98
+STORED SCORE IN DB: 18.98
+
+================================================================================
+DEBUGGING POST: Lost connection to Social Media and need a way back
+ID: t3_1qaxjm8
+================================================================================
+1. SEMANTIC FIT: 41.4%
+   Contribution: 6.22 (multiplier: 15.0)
+2. COMMUNITY INTENSITY: 1.91
+   (Reddit Score: 2, Comments: 2)
+3. SIGNALS AND GATING:
+   Detected Intents: []
+   Product Keywords Matched: {'pain_points': [], 'intents': []}
+   Has Product Context? NO
+   Similarity >= New Baseline (0.5)? NO (0.41)
+   GATE STATUS -> Intent Bonus blocked: 0.0 (Reason: No context and Similarity < 0.5)
+
+FINAL CALCULATED SCORE: 8.12
+STORED SCORE IN DB: 8.12

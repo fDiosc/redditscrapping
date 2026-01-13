@@ -16,6 +16,7 @@ import SonarLogo from '../components/SonarLogo';
 
 const LandingPage = ({ onGetStarted, onSignIn }) => {
     const [activeTab, setActiveTab] = useState('detect');
+    const [activeDemo, setActiveDemo] = useState('setup');
     const [isAnnual, setIsAnnual] = useState(false);
 
     const pillars = {
@@ -108,7 +109,7 @@ const LandingPage = ({ onGetStarted, onSignIn }) => {
 
                     <div className="grid grid-cols-1 lg:grid-cols-3 gap-12 mb-20">
                         {[
-                            { step: "01", title: "Configure Your Radar", desc: "Define your product, keywords, and target subreddits in under 5 minutes.", icon: <Search size={24} className="text-indigo-400" /> },
+                            { step: "01", title: "Configure Your Sonar", desc: "Define your product, keywords, and target subreddits in under 5 minutes.", icon: <Search size={24} className="text-indigo-400" /> },
                             { step: "02", title: "Run Intelligence Sync", desc: "One click to scan thousands of discussions with neural semantic matching.", icon: <Activity size={24} className="text-indigo-400" /> },
                             { step: "03", title: "Engage & Close", desc: "Review AI-qualified insights and generate authentic, tone-matched responses.", icon: <Zap size={24} className="text-indigo-400" /> }
                         ].map((item, i) => (
@@ -128,17 +129,59 @@ const LandingPage = ({ onGetStarted, onSignIn }) => {
                     </div>
 
                     {/* Storylane Container */}
-                    <div className="aspect-video w-full max-w-5xl mx-auto bg-slate-900/50 rounded-2xl border border-white/10 flex flex-col items-center justify-center relative overflow-hidden group">
-                        <div className="absolute inset-0 bg-indigo-500/5 blur-3xl opacity-50"></div>
-                        <div className="relative z-10 text-center px-6">
-                            <div className="w-20 h-20 bg-indigo-600/20 rounded-full flex items-center justify-center mb-6 mx-auto border border-indigo-500/30 group-hover:scale-110 transition-transform duration-500">
-                                <Zap size={40} className="text-indigo-400" />
+                    <div className="w-full max-w-6xl mx-auto mt-20">
+                        <div className="flex flex-col md:flex-row items-center justify-center gap-4 mb-8">
+                            <button
+                                onClick={() => setActiveDemo('setup')}
+                                className={`px-6 py-3 rounded-xl font-bold text-sm transition-all flex items-center gap-2 border ${activeDemo === 'setup' ? 'bg-indigo-600 text-white border-indigo-500 shadow-lg shadow-indigo-600/20' : 'bg-slate-900/50 text-slate-400 border-white/5 hover:border-white/10'}`}
+                            >
+                                <ZapIcon size={16} /> 1. Setup & First Sync
+                            </button>
+                            <button
+                                onClick={() => setActiveDemo('dashboard')}
+                                className={`px-6 py-3 rounded-xl font-bold text-sm transition-all flex items-center gap-2 border ${activeDemo === 'dashboard' ? 'bg-indigo-600 text-white border-indigo-500 shadow-lg shadow-indigo-600/20' : 'bg-slate-900/50 text-slate-400 border-white/5 hover:border-white/10'}`}
+                            >
+                                <Activity size={16} /> 2. Dashboard & AI Response
+                            </button>
+                        </div>
+
+                        <div className="w-full max-w-6xl mx-auto">
+                            <div
+                                className="sl-embed"
+                                style={{ position: 'relative', paddingBottom: 'calc(49.22% + 25px)', width: '100%', height: 0, transform: 'scale(1)' }}
+                            >
+                                <iframe
+                                    loading="lazy"
+                                    className="sl-demo shadow-2xl"
+                                    src={activeDemo === 'setup'
+                                        ? "https://productlab.storylane.io/demo/es8fkpu2quvs?embed=popup"
+                                        : "https://productlab.storylane.io/demo/z5sbebxuao04?embed=popup"
+                                    }
+                                    name="sl-embed"
+                                    allow="fullscreen"
+                                    allowFullScreen
+                                    style={{
+                                        position: 'absolute',
+                                        top: 0,
+                                        left: 0,
+                                        width: '100%',
+                                        height: '100%',
+                                        border: '1px solid rgba(63,95,172,0.2)',
+                                        borderRadius: '16px',
+                                        boxSizing: 'border-box',
+                                        backgroundColor: '#030712'
+                                    }}
+                                    title="SonarPro Demo"
+                                ></iframe>
                             </div>
-                            <h3 className="text-2xl font-bold text-white mb-2 font-display">See SonarPro in Action</h3>
-                            <p className="text-slate-400 mb-8 max-w-md mx-auto">Watch how we find a high-intent marketing lead and generate a response in under 60 seconds.</p>
-                            <div className="inline-flex items-center gap-2 bg-indigo-500/20 border border-indigo-500/50 px-6 py-3 rounded-xl text-white font-bold cursor-pointer hover:bg-indigo-500/30 transition-all">
-                                <Activity size={16} />
-                                [ Storylane Demo Placeholder ]
+                        </div>
+
+                        <div className="mt-8 flex items-center justify-center gap-6 text-slate-500">
+                            <div className="flex items-center gap-2 text-xs font-medium">
+                                <ShieldCheck size={14} className="text-emerald-500/50" /> No account required to watch
+                            </div>
+                            <div className="flex items-center gap-2 text-xs font-medium">
+                                <Users size={14} className="text-indigo-500/50" /> 100% Interactive Demos
                             </div>
                         </div>
                     </div>
@@ -167,7 +210,7 @@ const LandingPage = ({ onGetStarted, onSignIn }) => {
                                     { label: "Lead Discovery Speed", manual: "5-10 hours / week", pro: "3 minutes / day" },
                                     { label: "Content Analysis", manual: "Human reading", pro: "Neural Semantic Matching" },
                                     { label: "Engagement Quality", manual: "Hit or Miss", pro: "Tone-Matched Precision" },
-                                    { label: "Consistency", manual: "Manual & Tiring", pro: "24/7 Automated Radar" }
+                                    { label: "Consistency", manual: "Manual & Tiring", pro: "24/7 Automated Sonar" }
                                 ].map((row, i) => (
                                     <tr key={i} className="border-b border-white/5 hover:bg-white/5 transition-colors">
                                         <td className="py-5 px-8 font-medium text-slate-300">{row.label}</td>

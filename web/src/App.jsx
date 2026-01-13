@@ -673,7 +673,7 @@ function MainApp() {
   // ALL hooks must be called at the top, before any conditional returns
   const [config, setConfig] = useState({ products: [], subreddits: [] });
   const [selectedProduct, setSelectedProduct] = useState(null);
-  const [activeFilter, setActiveFilter] = useState("all");
+  const [activeFilter, setActiveFilter] = useState("all"); // all, priority, intensity, untriaged
   const [selectedSubs, setSelectedSubs] = useState([]);
   const [selectedReports, setSelectedReports] = useState(["DIRECT_FIT", "INTENSITY"]);
   const [days, setDays] = useState(3);
@@ -909,8 +909,26 @@ function MainApp() {
     if (activeFilter === "fit") return t.semantic_similarity > 0.5;
     if (activeFilter === "intensity") return t.community_score > 3.0;
     if (activeFilter === "score") return t.relevance_score > 15.0;
+    if (activeFilter === "untriaged") return !t.triage_status;
     return true;
   });
+
+  const handleTriage = async (postId, status) => {
+    try {
+      const headers = await getAuthHeaders();
+      const currentThread = threads.find(t => t.id === postId);
+      const newStatus = currentThread.triage_status === status ? 'null' : status;
+
+      await axios.post(`${API_BASE}/api/threads/${postId}/triage?status=${newStatus}&product_id=${selectedProduct}`, {}, { headers });
+
+      setThreads(prev => prev.map(t =>
+        t.id === postId ? { ...t, triage_status: newStatus === 'null' ? null : newStatus } : t
+      ));
+    } catch (err) {
+      console.error("Triage update failed:", err);
+      alert("Failed to save feedback.");
+    }
+  };
 
   const handleSync = async () => {
     console.log("Sync triggered. Product:", selectedProduct, "Subs:", selectedSubs, "Reports:", selectedReports);
@@ -1000,6 +1018,7 @@ function MainApp() {
                   </div>
                 </section>
 
+                {/* 
                 <section>
                   <label className="text-xs font-semibold uppercase tracking-wider text-slate-500 mb-2 block">Report Types</label>
                   <div className="space-y-2">
@@ -1018,6 +1037,7 @@ function MainApp() {
                     ))}
                   </div>
                 </section>
+                */}
 
                 <section>
                   <label className="text-xs font-semibold uppercase tracking-wider text-slate-500 mb-2 block">Scraping Range (Days)</label>
@@ -1126,10 +1146,6 @@ function MainApp() {
                   <div className="flex gap-4">
                     <button onClick={fetchThreads} className="p-3 bg-slate-900 border border-slate-800 rounded-lg text-slate-400 hover:text-white transition-all">
                       <RefreshCw size={20} className={loading ? 'animate-spin' : ''} />
-                    </button>
-                    <button className="flex items-center gap-2 bg-slate-100 text-slate-900 px-6 py-3 rounded-lg font-bold hover:bg-white transition-all">
-                      <FileText size={18} />
-                      Export Results
                     </button>
                   </div>
                 </header>
@@ -1316,6 +1332,32 @@ function MainApp() {
                                   }`}>
                                   {isExpanded ? "Collapse" : "View Analysis"}
                                   <ChevronDown size={14} className={`transition-transform duration-300 ${isExpanded ? 'rotate-180' : ''}`} />
+                                </div>
+
+                                {thread.is_stale === 1 && (
+                                  <div
+                                    className="flex items-center gap-1 px-2 py-1 bg-amber-500/10 border border-amber-500/20 rounded-lg animate-pulse"
+                                    title={`Metrics changed significantly since last review (Previous Score: ${thread.triage_relevance_snapshot?.toFixed(1)})`}
+                                  >
+                                    <AlertTriangle size={12} className="text-amber-500" />
+                                    <span className="text-[9px] font-black text-amber-500 uppercase tracking-tighter">Review Needed</span>
+                                  </div>
+                                )}
+                                <div className="flex items-center gap-1.5 p-1 bg-slate-900/80 border border-slate-700/50 rounded-lg ml-2">
+                                  <button
+                                    onClick={(e) => { e.stopPropagation(); handleTriage(thread.id, 'agree'); }}
+                                    className={`p-1.5 rounded-md transition-all ${thread.triage_status === 'agree' ? 'bg-emerald-500 text-white shadow-lg shadow-emerald-500/20' : 'text-slate-500 hover:bg-slate-800 hover:text-emerald-400'}`}
+                                    title="Agree with this lead"
+                                  >
+                                    <ThumbsUp size={14} />
+                                  </button>
+                                  <button
+                                    onClick={(e) => { e.stopPropagation(); handleTriage(thread.id, 'disagree'); }}
+                                    className={`p-1.5 rounded-md transition-all ${thread.triage_status === 'disagree' ? 'bg-red-500 text-white shadow-lg shadow-red-500/20' : 'text-slate-500 hover:bg-slate-800 hover:text-red-400'}`}
+                                    title="Disagree with this lead"
+                                  >
+                                    <ThumbsDown size={14} />
+                                  </button>
                                 </div>
                               </div>
                             </div>

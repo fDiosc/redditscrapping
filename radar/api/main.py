@@ -50,10 +50,15 @@ async def get_threads(user_id: str = Depends(get_current_user), product: str = N
     conn.row_factory = lambda cursor, row: dict(zip([col[0] for col in cursor.description], row))
     cursor = conn.cursor()
     
-    # We show threads joined with their product-specific analysis and latest generated response
     # Filter by user_id to only show user's analysis
     cursor.execute("""
-        SELECT p.*, pa.relevance_score, pa.semantic_similarity, pa.community_score, pa.ai_analysis, pa.signals_json,
+        SELECT p.*, pa.relevance_score, pa.semantic_similarity, pa.community_score, pa.ai_analysis, pa.signals_json, 
+               pa.triage_status, pa.triage_relevance_snapshot,
+               CASE 
+                 WHEN pa.triage_status IS NOT NULL 
+                      AND ABS(pa.relevance_score - IFNULL(pa.triage_relevance_snapshot, 0)) > 1.0 
+                 THEN 1 ELSE 0 
+               END as is_stale,
                r.id as res_id, r.response_text as res_text, r.style as res_style, r.tokens_used as res_tokens
         FROM posts p
         JOIN post_analysis pa ON p.id = pa.post_id
@@ -72,7 +77,6 @@ async def get_threads(user_id: str = Depends(get_current_user), product: str = N
     threads = []
     for row in rows:
         thread = dict(row)
-        # Format the response if it exists
         if thread.get('res_id'):
             thread['generatedResponse'] = {
                 "id": thread['res_id'],
@@ -84,6 +88,20 @@ async def get_threads(user_id: str = Depends(get_current_user), product: str = N
         
     conn.close()
     return threads
+
+@app.post("/api/threads/{post_id}/triage")
+async def triage_thread(
+    post_id: str, 
+    status: str = Query(..., regex="^(agree|disagree|null)$"),
+    product_id: str = Query(...),
+    user_id: str = Depends(get_current_user)
+):
+    """Save user feedback for a lead."""
+    from radar.storage.db import update_triage_status
+    # Map 'null' string to None for DB
+    db_status = None if status == "null" else status
+    update_triage_status(user_id, product_id, post_id, db_status)
+    return {"status": "success", "triage": status}
 
 # Global state for sync tracking
 SYNC_STATE = {

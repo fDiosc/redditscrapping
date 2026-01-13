@@ -1,0 +1,102 @@
+
+--- Listing Top 100 SocialGenius Leads ---
+ID: t3_1qaqeuv | Score: 20.01 | Sim: 0.51 | Title: About Instagram auto Dms
+ID: t3_1q9xv0c | Score: 18.98 | Sim: 0.53 | Title: Want to hire someone to run my IG/TIKTOK
+ID: t3_1qarbzv | Score: 16.87 | Sim: 0.50 | Title: What part of your marketing workflow makes you want to scream?
+ID: t3_1qar2ir | Score: 14.93 | Sim: 0.45 | Title: How to create Reels easily for a newsletter startup (no video editor)
+ID: t3_1qb35wy | Score: 14.91 | Sim: 0.44 | Title: Got tired of editing video, built an AI-based auto editor for shorts. Looking for beta testers!
+ID: t3_1q96fy4 | Score: 13.84 | Sim: 0.47 | Title: Made $100k with my SaaS in 12 months. Here’s what worked and what didn't
+ID: t3_1q8a99r | Score: 13.77 | Sim: 0.44 | Title: Reminder: Your project doesn’t need to be finished to be interesting.
+ID: t3_1q5hzvp | Score: 13.34 | Sim: 0.36 | Title: After 4 years, I am finally made a profitable SaaS!
+ID: t3_1qarlkb | Score: 13.33 | Sim: 0.54 | Title: We’re a small social media management team looking to work with businesses/startups 🚀
+ID: t3_1q5huna | Score: 13.33 | Sim: 0.47 | Title: I built a free mission statement generator because 4,700 people search for it every month
+ID: t3_1q7p5wu | Score: 13.31 | Sim: 0.45 | Title: How do you find actionable feedback and demand before building?
+ID: t3_1q8k3y1 | Score: 13.17 | Sim: 0.56 | Title: Lembra do SocialGenius? Ouvimos o feedback de vocês e evoluimos. A IA para Instagram
+ID: t3_1q8k3uh | Score: 12.99 | Sim: 0.43 | Title: Don't skip validating your ideas, its the worst
+ID: t3_1qan1vn | Score: 12.56 | Sim: 0.49 | Title: What social media tools are actually worth using going into 2026?
+ID: t3_1q6x8xz | Score: 12.46 | Sim: 0.42 | Title: I built a “Chat Wrapped” for your messages struggling to decide if it’s a product or a feature
+ID: t3_1q6e5te | Score: 12.32 | Sim: 0.41 | Title: How do you personally track new Upwork jobs?
+ID: t3_1q97dvq | Score: 12.30 | Sim: 0.40 | Title: What makes a marketer more hireable - industry specialization or technical skills?
+ID: t3_1q9p2th | Score: 12.24 | Sim: 0.43 | Title: This is not asking how to get millions of views, i just want to know how to work the tiktok algorithm.
+ID: t3_1qa35y4 | Score: 12.00 | Sim: 0.24 | Title: "Zzzzz - Nothing wakes you up as Nescafe." What's your take on this print ad design?
+ID: t3_1q8ijdr | Score: 11.97 | Sim: 0.47 | Title: stop trying to be everywhere at once
+ID: t3_1q8eduo | Score: 11.82 | Sim: 0.36 | Title: Looking for viral content ideas for a faceless sports betting/analysis brand
+ID: t3_1qb2h31 | Score: 11.77 | Sim: 0.43 | Title: To everyone who made tiktok content their main goal for 2026
+ID: t3_1q7gdzb | Score: 11.67 | Sim: 0.40 | Title: Easy python tool for cold emails, open source
+ID: t3_1q99oeu | Score: 11.33 | Sim: 0.39 | Title: what's your tech and ops stack?
+ID: t3_1qasb6z | Score: 11.13 | Sim: 0.31 | Title: my shopify store just got wrecked overnight….
+ID: t3_1q78lse | Score: 11.09 | Sim: 0.38 | Title: I was tired of juggling AI tabs, so I built an app to chat with 120+ models from a single account
+ID: t3_1qathec | Score: 11.06 | Sim: 0.42 | Title: shopify just turned every AI into a sales channel (ChatGPT, Gemini & Co-pilot)
+ID: t3_1q9eg1m | Score: 10.96 | Sim: 0.46 | Title: How I Turn Competitors' "Comment to Get X" Posts Into Warm Leads (Strategy Breakdown)
+ID: t3_1qa20qk | Score: 10.89 | Sim: 0.50 | Title: Social media managers: What tasks take up most of your time?
+ID: t3_1qakfsk | Score: 10.73 | Sim: 0.35 | Title: Comecei 2026 com um desafio: criar 12 projetos pra atingir 100k de MRR. O primeiro já está no ar.
+ID: t3_1q606i2 | Score: 10.69 | Sim: 0.28 | Title: Tenho 17 anos, criei um ERP SaaS e queria feedbacks sinceros
+ID: t3_1qb5clb | Score: 10.59 | Sim: 0.36 | Title: The AI Chargeback Apocalypse
+ID: t3_1q7ww5v | Score: 10.58 | Sim: 0.31 | Title: A conta não fecha na minha plataforma de psicólogos
+ID: t3_1qaidf6 | Score: 10.53 | Sim: 0.41 | Title: Got a Dream In-House Media Role!.. That I Hate. What Do I Do?
+ID: t3_1q9e0hy | Score: 10.49 | Sim: 0.47 | Title: How I Turn Competitors’ “Comment to Get X” Posts Into Warm Leads (Strategy Breakdown)
+ID: t3_1qb3626 | Score: 10.48 | Sim: 0.35 | Title: Agentic Storefronts are coming
+ID: t3_1q7yutk | Score: 10.39 | Sim: 0.39 | Title: Pergunta sobre conteúdo de IA
+ID: t3_1q9kqmx | Score: 10.38 | Sim: 0.36 | Title: Anxiety and being overwhelmed
+ID: t3_1qawmbp | Score: 10.27 | Sim: 0.36 | Title: Acc. to you, what are the habits of a great marketer?
+ID: t3_1qb1l5f | Score: 10.26 | Sim: 0.45 | Title: Loomly is dropping support for x
+ID: t3_1q9w7md | Score: 9.89 | Sim: 0.44 | Title: loreal just launched an ai content company and it got me thinking about how much our jobs have changed
+ID: t3_1q7egbd | Score: 9.79 | Sim: 0.37 | Title: Ciclo de validação
+ID: t3_1qb6l4z | Score: 9.75 | Sim: 0.31 | Title: Agentic Storefront - Fees (Quite High for ChatGPT)
+ID: t3_1q9ajzv | Score: 9.65 | Sim: 0.32 | Title: What's the best site to buy Google reviews in 2026?
+ID: t3_1q95wa1 | Score: 9.65 | Sim: 0.38 | Title: To anyone who's done wasting time and ready to grow in 2026
+ID: t3_1q9gqq7 | Score: 9.55 | Sim: 0.39 | Title: Upsell / Cross Sell Apps?
+ID: t3_1q6it6k | Score: 9.39 | Sim: 0.33 | Title: A Newsletter for who wants to make money with a good skill !!
+ID: t3_1q9bs8z | Score: 9.34 | Sim: 0.34 | Title: [PITCH] TEEEG - Validar MicroSaaS com usuários reais
+ID: t3_1q9r523 | Score: 9.28 | Sim: 0.34 | Title: Brand Research
+ID: t3_1q9da0a | Score: 9.27 | Sim: 0.25 | Title: literally how do people actually start a business?
+ID: t3_1qam87r | Score: 9.26 | Sim: 0.43 | Title: Day 6 of growing an AI account from scratch: YouTube Shorts is winning, Reddit is banning, and the pivot to Faceless Video.
+ID: t3_1q9f2h8 | Score: 9.26 | Sim: 0.32 | Title: How do you handle discount code abuse (multi-accounts / same address reuse)?
+ID: t3_1q9qn8n | Score: 9.21 | Sim: 0.30 | Title: My snowman TikTok (Netherlands) gets no likes despite other snowman TikToks do. What could go wrong? It's just a simple snowman TikTok and a simple niche so didn't mine get any likes?
+ID: t3_1qa2c5z | Score: 9.19 | Sim: 0.32 | Title: Me indique os melhores cursos ou vídeos de tráfego pago
+ID: t3_1q8qn2j | Score: 9.17 | Sim: 0.43 | Title: How to use Instagram? How to make reels/stories etc to get a lot of followers and engagement? Is there a course of video, resources etc you can recommend? This is for my personal Instagram. What niches get the most success?
+ID: t3_1q9ymlh | Score: 9.16 | Sim: 0.36 | Title: Read a really good piece of advice yesterday about ecommerce and it stuck with me
+ID: t3_1q9vhl7 | Score: 9.05 | Sim: 0.42 | Title: Vibe scraping at scale with AI Web Agents, just prompt => get data
+ID: t3_1qav6us | Score: 9.01 | Sim: 0.28 | Title: Problems buying Canada Post labels through Shopify right now?
+ID: t3_1q6knis | Score: 8.93 | Sim: 0.32 | Title: Criei um Sass que recebe seu currículo 1 vez e vc consegue criar currículos customizados para vagas
+ID: t3_1q9z655 | Score: 8.92 | Sim: 0.27 | Title: First label printer recommendations - Startup
+ID: t3_1q9enmf | Score: 8.87 | Sim: 0.45 | Title: Need Guidance
+ID: t3_1qb98eq | Score: 8.82 | Sim: 0.23 | Title: The small bakery owner I work for said my future small cafe idea will fail. Is it really that impossible?
+ID: t3_1qati23 | Score: 8.78 | Sim: 0.36 | Title: How effective are customer testimonials when used as core marketing content?
+ID: t3_1qa4sip | Score: 8.70 | Sim: 0.35 | Title: Went viral on TikTok, what is the best way to thank my early followers?
+ID: t3_1q8oh42 | Score: 8.67 | Sim: 0.33 | Title: Estou criando um saas de geo localização
+ID: t3_1qaoccr | Score: 8.67 | Sim: 0.29 | Title: [Android] I built a tiny Share target that copies IMAGES to the clipboard (paste into X, WhatsApp, Telegram, etc.) — need testers
+ID: t3_1qbaahy | Score: 8.60 | Sim: 0.40 | Title: Anyone have experience with Facebook ads?
+ID: t3_1qb4hnk | Score: 8.58 | Sim: 0.40 | Title: This Week's Top E-commerce News Stories 💥 Jan 12th, 2026
+ID: t3_1q9uxlg | Score: 8.52 | Sim: 0.40 | Title: I built a password-free way to see who unfollowed you on IG (using GDPR data) looking for some testers
+ID: t3_1qaggkr | Score: 8.50 | Sim: 0.44 | Title: I need help on the Gina stages of launching my social media website/app
+ID: t3_1qauyrh | Score: 8.45 | Sim: 0.35 | Title: Will help your account- Engage 4 engage (not follow 4 follow )
+ID: t3_1q9c2s4 | Score: 8.45 | Sim: 0.34 | Title: If I want to post on Instagram but don't want to include my face, what are the best ways to hide it? Is there a filter most commonly used or an effect that covers it in a good way?
+ID: t3_1qb0lq2 | Score: 8.44 | Sim: 0.40 | Title: Stop obsessing over the Algorithm. Obsess over your ""Pulse"" instead.
+ID: t3_1q9four | Score: 8.40 | Sim: 0.27 | Title: How to market your product without losing aura?
+ID: t3_1q8mhfi | Score: 8.39 | Sim: 0.30 | Title: Como vocês validam problema antes de investir em marketing?
+ID: t3_1qa70qm | Score: 8.37 | Sim: 0.42 | Title: 100 Proven Instagram Hooks That Went Viral {Steal Them for Your Content}
+ID: t3_1q9j3t4 | Score: 8.36 | Sim: 0.38 | Title: How do social teams actually deal with copyright and asset licensing?
+ID: t3_1q9h5kh | Score: 8.32 | Sim: 0.32 | Title: Advice needed. Boss creates a brief for an ad, I follow the brief and create the ad, boss takes the copy and rewrites it with AI, and provides two options back for me to choose from and both need edits so they don't look like exactly what they are. What do you do?
+ID: t3_1q7pylx | Score: 8.25 | Sim: 0.35 | Title: Quando o alcance cai, o problema é engajamento ou conversão?
+ID: t3_1q9koez | Score: 8.25 | Sim: 0.37 | Title: business advice from Ai?
+ID: t3_1q99vw7 | Score: 8.25 | Sim: 0.35 | Title: Criei um agente de IA para fazer minha gestão financeira - Feedbacks no MVP?
+ID: t3_1q9fkzn | Score: 8.21 | Sim: 0.41 | Title: Strategy to go Viral
+ID: t3_1q9k2xk | Score: 8.20 | Sim: 0.33 | Title: Is meta verified the reason behind my decline in reach?
+ID: t3_1q9j4m1 | Score: 8.19 | Sim: 0.25 | Title: Construí um encurtador de links com war room público em edge (Cloudflare) — quem quiser tentar derrubar, tá convidado
+ID: t3_1qbbo6h | Score: 8.18 | Sim: 0.38 | Title: Shopify's Agentic Plan signals a future where store front ends are (mostly) irrelevant
+ID: t3_1q8on3v | Score: 8.16 | Sim: 0.19 | Title: We got 12 orders within a single day from almost same person with different names and addresses. All are prepaid. Any scam or something wrong?
+ID: t3_1qba899 | Score: 8.15 | Sim: 0.37 | Title: How did you progress from the stage of being given work to finding work?
+ID: t3_1qase9w | Score: 8.15 | Sim: 0.40 | Title: Are there any Content creators here who work for churches? How do you avoid burnout and find new ideas every week?
+ID: t3_1qaxjm8 | Score: 8.12 | Sim: 0.41 | Title: Lost connection to Social Media and need a way back
+ID: t3_1qa1wut | Score: 8.10 | Sim: 0.42 | Title: A practical AI-agent workflow for marketing ops (without breaking attribution)
+ID: t3_1qb0htm | Score: 8.10 | Sim: 0.41 | Title: What’s working right now to grow fb pages?
+ID: t3_1qapufs | Score: 8.09 | Sim: 0.33 | Title: Confused about my Job and Future
+ID: t3_1q9h9sr | Score: 8.06 | Sim: 0.40 | Title: Seeking a Social Media Marketer for Electronic Music Content (Major City Hubs)
+ID: t3_1q9ui3g | Score: 8.05 | Sim: 0.42 | Title: A practical AI agent workflow for CRM hygiene and lead routing
+ID: t3_1q7njx5 | Score: 8.03 | Sim: 0.31 | Title: 3 prompts práticos (gratuitos) para criar e-mails que convertem — testem e digam o que acham
+ID: t3_1qa44aj | Score: 7.99 | Sim: 0.33 | Title: Giving up social media
+ID: t3_1qauggj | Score: 7.98 | Sim: 0.34 | Title: Follow for follow?
+ID: t3_1q7xlxl | Score: 7.97 | Sim: 0.38 | Title: Posicionamentos no Meta Ads: deixo tudo marcado?
+ID: t3_1qad1d5 | Score: 7.96 | Sim: 0.39 | Title: What are you all using as a customer service, help desk, or live chat software?
+ID: t3_1q9mwxh | Score: 7.92 | Sim: 0.30 | Title: Movie Theater Ads

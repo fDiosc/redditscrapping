@@ -1,25 +1,21 @@
+from radar.storage.db import init_db
 import sqlite3
 import os
 
-db_path = "data/radar.db"
-conn = sqlite3.connect(db_path)
-cursor = conn.row_factory = sqlite3.Row
-cursor = conn.cursor()
-
-columns = [
-    ("ai_analysis", "TEXT"),
-    ("semantic_similarity", "REAL DEFAULT 0"),
-    ("community_score", "REAL DEFAULT 0"),
-    ("last_processed_score", "INTEGER DEFAULT -1"),
-    ("last_processed_comments", "INTEGER DEFAULT -1")
-]
-
-for col_name, col_type in columns:
-    try:
-        print(f"Adding {col_name}...")
-        cursor.execute(f"ALTER TABLE posts ADD COLUMN {col_name} {col_type}")
-        conn.commit()
-    except sqlite3.OperationalError as e:
-        print(f"Error adding {col_name}: {e}")
-
-conn.close()
+if __name__ == "__main__":
+    db_path = "data/radar.db"
+    print(f"Forcing database migration on {db_path}...")
+    init_db()
+    
+    conn = sqlite3.connect(db_path)
+    cursor = conn.cursor()
+    cursor.execute("PRAGMA table_info(post_analysis)")
+    cols = [row[1] for row in cursor.fetchall()]
+    print(f"Columns in post_analysis: {cols}")
+    
+    if "updated_at" in cols:
+        print("SUCCESS: updated_at column found.")
+    else:
+        print("ERROR: updated_at column MISSING.")
+        
+    conn.close()
