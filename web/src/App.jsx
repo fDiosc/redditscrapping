@@ -46,7 +46,16 @@ import {
 import LandingPage from './pages/LandingPage';
 import SonarLogo from './components/SonarLogo';
 
-const API_BASE = import.meta.env.VITE_API_BASE || "http://127.0.0.1:8000";
+const API_BASE = import.meta.env.VITE_API_BASE || 'http://localhost:8000';
+
+const STYLE_LABELS = {
+  empathetic: '💜 Empathetic',
+  helpful_expert: '🎓 Helpful Expert',
+  casual: '😊 Casual',
+  technical: '🔧 Technical',
+  brief: '⚡ Brief',
+  product_referral: '🚀 Product Referral'
+};
 
 
 const Tooltip = ({ text, children }) => {
@@ -156,7 +165,8 @@ const ProductModal = ({ isOpen, onClose, onSave, product }) => {
     pain_signals: [],
     intent_signals: [],
     target_subreddits: [],
-    website_url: ""
+    website_url: "",
+    default_response_style: "empathetic"
   });
 
   useEffect(() => {
@@ -168,7 +178,7 @@ const ProductModal = ({ isOpen, onClose, onSave, product }) => {
         target_subreddits: typeof product.target_subreddits === 'string' ? JSON.parse(product.target_subreddits) : product.target_subreddits,
       });
     } else {
-      setFormData({ name: "", description: "", pain_signals: [], intent_signals: [], target_subreddits: [], website_url: "" });
+      setFormData({ name: "", description: "", pain_signals: [], intent_signals: [], target_subreddits: [], website_url: "", default_response_style: "empathetic" });
     }
   }, [product, isOpen]);
 
@@ -260,6 +270,19 @@ const ProductModal = ({ isOpen, onClose, onSave, product }) => {
               onChange={e => setFormData({ ...formData, website_url: e.target.value })}
               placeholder="https://profitdoctor.app"
             />
+          </div>
+
+          <div className="space-y-2">
+            <label className="text-xs font-bold text-slate-500 uppercase">Default AI Response Style</label>
+            <select
+              className="w-full bg-slate-800 border border-slate-700 rounded-lg p-3 text-white outline-none focus:ring-2 focus:ring-indigo-500"
+              value={formData.default_response_style || "empathetic"}
+              onChange={e => setFormData({ ...formData, default_response_style: e.target.value })}
+            >
+              {Object.entries(STYLE_LABELS).map(([val, label]) => (
+                <option key={val} value={val}>{label}</option>
+              ))}
+            </select>
           </div>
 
           <div className="space-y-2">
@@ -387,6 +410,10 @@ const ProductManagement = ({ products, onEdit, onDelete, onCreate }) => {
 
               <div className="mt-2 space-y-3">
                 <div className="flex items-center justify-between text-[10px] uppercase font-bold tracking-wider text-slate-500">
+                  <span>AI Style</span>
+                  <span className="text-purple-400 font-mono bg-purple-500/5 px-2 py-0.5 rounded-full">{STYLE_LABELS[p.default_response_style] || STYLE_LABELS.empathetic}</span>
+                </div>
+                <div className="flex items-center justify-between text-[10px] uppercase font-bold tracking-wider text-slate-500">
                   <span>Pain Signals</span>
                   <span className="text-indigo-400 font-mono bg-indigo-500/5 px-2 py-0.5 rounded-full">{pain.length}</span>
                 </div>
@@ -465,15 +492,6 @@ const ResponseCard = ({ response, postUrl, onRegenerate, availableStyles, loadin
       setTargetStyle(null);
     }
   }, [loading]);
-
-  const STYLE_LABELS = {
-    empathetic: '💜 Empathetic',
-    helpful_expert: '🎓 Helpful Expert',
-    casual: '😊 Casual',
-    technical: '🔧 Technical',
-    brief: '⚡ Brief',
-    product_referral: '🚀 Product Referral'
-  };
 
   const handleCopy = async () => {
     if (loading || !displayResponse) return;
@@ -952,6 +970,8 @@ function MainApp() {
     if (activeFilter === "untriaged") return !t.triage_status;
     return true;
   });
+
+  const productDefaultStyle = products.find(p => p.id === selectedProduct)?.default_response_style || "empathetic";
 
   const handleTriage = async (postId, status) => {
     try {
@@ -1475,7 +1495,7 @@ function MainApp() {
                                       <GenerateResponseButton
                                         postId={thread.id}
                                         productId={selectedProduct}
-                                        defaultStyle={JSON.parse(thread.ai_analysis || '{}').urgency === 'High' ? 'empathetic' : 'helpful_expert'}
+                                        defaultStyle={productDefaultStyle}
                                         onGenerated={(res) => {
                                           setThreads(prev => prev.map(t =>
                                             t.id === thread.id ? { ...t, generatedResponse: res, isRegenerating: false, genError: null } : t

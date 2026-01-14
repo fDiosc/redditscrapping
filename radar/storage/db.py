@@ -102,6 +102,7 @@ def init_db():
         created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
         updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
         website_url TEXT,
+        default_response_style TEXT DEFAULT 'empathetic',
         PRIMARY KEY (id, user_id)
     )
     """)
@@ -202,6 +203,13 @@ def init_db():
     # Migration: add website_url to products
     try:
         cursor.execute("ALTER TABLE products ADD COLUMN website_url TEXT")
+        conn.commit()
+    except sqlite3.OperationalError:
+        pass
+
+    # Migration: add default_response_style to products
+    try:
+        cursor.execute("ALTER TABLE products ADD COLUMN default_response_style TEXT DEFAULT 'empathetic'")
         conn.commit()
     except sqlite3.OperationalError:
         pass
@@ -505,8 +513,8 @@ def save_product_record(product_data: Dict[str, Any]):
     cursor.execute("""
     INSERT OR REPLACE INTO products (
         id, user_id, name, description, pain_signals, intent_signals, 
-        target_subreddits, embedding_context, embedding_id, updated_at, website_url
-    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP, ?)
+        target_subreddits, embedding_context, embedding_id, updated_at, website_url, default_response_style
+    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP, ?, ?)
     """, (
         product_data['id'],
         product_data['user_id'],
@@ -517,7 +525,8 @@ def save_product_record(product_data: Dict[str, Any]):
         target_subreddits,
         product_data.get('embedding_context'),
         product_data.get('embedding_id'),
-        product_data.get('website_url')
+        product_data.get('website_url'),
+        product_data.get('default_response_style', 'empathetic')
     ))
     
     conn.commit()
