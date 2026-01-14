@@ -819,9 +819,6 @@ function MainApp() {
           const res = await axios.get(`${API_BASE}/api/sync/status`, { headers });
           setSyncStatus(res.data);
 
-          // Also refresh history during sync to see status changes in sidebar
-          fetchHistory();
-
           // Only stop if explicitly Success or Error, or if the backend says definitely not running
           // AND we haven't just had a transient error
           if (!res.data.is_running && (res.data.progress === 100 || res.data.error)) {
@@ -959,7 +956,6 @@ function MainApp() {
       const subParams = selectedSubs.map(s => `subreddits=${s}`).join('&');
       const url = `${API_BASE}/api/sync?${subParams}&days=${days}&product=${selectedProduct}`;
       await axios.post(url, {}, { headers });
-      fetchHistory();
       fetchConfig();
     } catch (err) {
       alert("Sync failed: " + (err.response?.data?.error || err.message));
@@ -1105,10 +1101,10 @@ function MainApp() {
                     <RefreshCw size={14} /> Run History
                   </label>
                   <div className="space-y-3 max-h-80 overflow-y-auto pr-2 custom-scrollbar">
-                    {history.length === 0 ? (
+                    {history.filter(run => run.status === 'Success' || run.status.startsWith('Error')).length === 0 ? (
                       <p className="text-[10px] text-slate-600 italic">No past runs recorded.</p>
                     ) : (
-                      history.map(run => (
+                      history.filter(run => run.status === 'Success' || run.status.startsWith('Error')).map(run => (
                         <div key={run.id} className="bg-slate-800/30 border border-slate-800 p-3 rounded-xl hover:border-slate-600 transition-all cursor-pointer group active:scale-95">
                           <div className="flex justify-between items-start mb-2">
                             <span className="text-[10px] font-black text-indigo-400 truncate uppercase w-2/3 tracking-tighter">{run.product}</span>
