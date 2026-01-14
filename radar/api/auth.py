@@ -69,7 +69,10 @@ def verify_clerk_token(token: str, jwks: list) -> dict:
             token,
             rsa_key,
             algorithms=["RS256"],
-            options={"verify_aud": False}  # Clerk doesn't always include audience
+            options={
+                "verify_aud": False,
+                "leeway": 60  # Tolerate up to 60 seconds of clock skew/delay
+            }
         )
         
         return payload
