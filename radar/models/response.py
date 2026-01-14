@@ -2,7 +2,7 @@ from pydantic import BaseModel, Field
 from typing import Literal, Optional
 from datetime import datetime
 
-ResponseStyle = Literal["empathetic", "helpful_expert", "casual", "technical", "brief"]
+ResponseStyle = Literal["empathetic", "helpful_expert", "casual", "technical", "brief", "product_referral"]
 
 class GenerateResponseRequest(BaseModel):
     """Request to generate a suggested response"""
