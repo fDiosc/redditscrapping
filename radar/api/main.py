@@ -110,17 +110,22 @@ async def triage_thread(
     update_triage_status(user_id, product_id, post_id, db_status)
     return {"status": "success", "triage": status}
 
-# Global state for sync tracking
-SYNC_STATE = {
-    "is_running": False,
-    "last_sync": None,
-    "current_step": "Idle",
-    "progress": 0
-}
-
 @app.get("/api/sync/status")
-async def get_sync_status():
-    return SYNC_STATE
+async def get_sync_status(user_id: str = Depends(get_current_user)):
+    from radar.storage.db import get_sync_history
+    history = get_sync_history(user_id, limit=1)
+    if not history:
+        return {"is_running": False, "current_step": "Idle", "progress": 0}
+    
+    latest = history[0]
+    is_running = latest['status'] in ['Running', 'Ingesting', 'Processing', 'Initializing']
+    
+    return {
+        "is_running": is_running,
+        "last_sync": latest['timestamp'] if not is_running else None,
+        "current_step": latest['status'],
+        "progress": latest['progress']
+    }
 
 @app.get("/api/threads/{post_id}/comments")
 async def get_post_comments(post_id: str):
@@ -140,61 +145,44 @@ async def sync_data(
     days: int = 3,
     product: Optional[str] = None
 ):
-    """Trigger ingestion, processing, and selective report generation for a user."""
-    if SYNC_STATE["is_running"]:
-        return {"error": "Sync already in progress", "status": SYNC_STATE}
-
-    from radar.storage.db import init_db, add_sync_run, update_sync_run_status
+    from radar.storage.db import add_sync_run, update_sync_run_status, get_sync_history
     from radar.ingest.reddit_scraper import RedditScraper
     from radar.cli import process as cli_process
-    from radar.cli import report as cli_report
     from datetime import datetime
+
+    # Check if this specific user has a run in progress
+    history = get_sync_history(user_id, limit=1)
+    if history and history[0]['status'] in ['Running', 'Ingesting', 'Processing', 'Initializing']:
+        return {"error": "Sync already in progress for your account", "status": history[0]}
 
     run_id = add_sync_run(user_id, product or "all", subreddits, days)
 
     def run_sync():
         try:
-            # Ensure DB schema is up to date
-            init_db()
-            
-            SYNC_STATE["progress"] = 0
             update_sync_run_status(run_id, "Ingesting", 10)
             
-            scraper_tool = RedditScraper()
-            # 1. Ingest
+            scraper_tool = RedditScraper(user_id=user_id)
             for i, sub in enumerate(subreddits):
-                SYNC_STATE["current_step"] = f"Ingesting r/{sub}..."
-                SYNC_STATE["progress"] = int((i / len(subreddits)) * 40)
-                # Remove hardcoded limit to allow scraper's internal date-based logic and pagination
+                progress = 10 + int((i / len(subreddits)) * 40)
+                update_sync_run_status(run_id, f"Ingesting r/{sub}...", progress)
                 scraper_tool.fetch_subreddit_posts(sub, days=days)
                 import time
                 time.sleep(0.5)
             
             # 2. Process
-            SYNC_STATE["current_step"] = "Analyzing and Scoring threads..."
-            SYNC_STATE["progress"] = 60
-            update_sync_run_status(run_id, "Processing", 60)
+            update_sync_run_status(run_id, "Analyzing and Scoring threads...", 60)
             cli_process(ai_analyze=True, target_product=product, subreddit_filter=subreddits, user_id=user_id)
 
-            SYNC_STATE["last_sync"] = datetime.now().isoformat()
-            SYNC_STATE["current_step"] = "Success"
-            SYNC_STATE["progress"] = 100
             update_sync_run_status(run_id, "Success", 100)
         except Exception as e:
-            SYNC_STATE["current_step"] = f"Error: {str(e)}"
-            update_sync_run_status(run_id, f"Error: {str(e)[:50]}", SYNC_STATE["progress"])
+            update_sync_run_status(run_id, f"Error: {str(e)[:100]}", 0)
         finally:
-            # Keep the 100% or error message for a few seconds if polled, 
-            # but we allow new syncs after a reset or in the next call
-            import time
-            time.sleep(2) 
-            SYNC_STATE["is_running"] = False
+            # No global variable to reset!
+            pass
 
-    SYNC_STATE["is_running"] = True
-    SYNC_STATE["progress"] = 0
-    SYNC_STATE["current_step"] = "Initializing..."
+    update_sync_run_status(run_id, "Initializing...", 5)
     background_tasks.add_task(run_sync)
-    return {"status": "Sync and Report generation started"}
+    return {"status": "Sync started", "run_id": run_id}
 
 @app.get("/api/products")
 async def list_products_api(user_id: str = Depends(get_current_user)):

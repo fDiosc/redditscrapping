@@ -25,7 +25,7 @@ USER_AGENTS = [
 class RedditScraper:
     """Scraper with anti-ban protections for Reddit using JSON fallback and Proxy support."""
     
-    def __init__(self):
+    def __init__(self, user_id: str = None):
         # Rate limiting config
         self.min_delay = 2.0
         self.max_delay = 5.0
@@ -50,9 +50,24 @@ class RedditScraper:
         # Proxy Configuration
         self.proxies = None
         if REDDIT_PROXY_URL:
+            proxy_url = REDDIT_PROXY_URL
+            if user_id:
+                # Add session to proxy user if it's a Bright Data style URL
+                # http://user:pass@host:port -> http://user-session-HASH:pass@host:port
+                import hashlib
+                session_hash = hashlib.md5(user_id.encode()).hexdigest()[:8]
+                
+                # Simple injection into the authentication part of the URL
+                if "@" in proxy_url:
+                    auth_part, host_part = proxy_url.split("@", 1)
+                    if ":" in auth_part:
+                        proto_user, password = auth_part.rsplit(":", 1)
+                        if "-session-" not in proto_user:
+                            proxy_url = f"{proto_user}-session-{session_hash}:{password}@{host_part}"
+            
             self.proxies = {
-                "http": REDDIT_PROXY_URL,
-                "https": REDDIT_PROXY_URL
+                "http": proxy_url,
+                "https": proxy_url
             }
     
     def _get_headers(self) -> dict:

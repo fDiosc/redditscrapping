@@ -56,7 +56,13 @@ def process(ai_analyze: bool = False, batch: int = 50, target_product: str = Non
     from radar.config import AI_ANALYSIS_THRESHOLD
     import json
     
-    posts = get_unprocessed_posts(subreddit_filter=subreddit_filter, limit=limit, force=force)
+    posts = get_unprocessed_posts(
+        subreddit_filter=subreddit_filter, 
+        limit=limit, 
+        force=force,
+        user_id=user_id,
+        product_id=target_product
+    )
     if not posts:
         console.print("[green]All specified posts are already processed.[/green]")
         return
@@ -154,7 +160,9 @@ def process(ai_analyze: bool = False, batch: int = 50, target_product: str = Non
                     "semantic_similarity": similarity,
                     "community_score": community_score,
                     "ai_analysis": ai_result,
-                    "signals_json": json.dumps(signals)
+                    "signals_json": json.dumps(signals),
+                    "last_processed_score": post['score'],
+                    "last_processed_comments": post['num_comments']
                 }, cursor=cursor)
 
             # Update master post record state
@@ -173,7 +181,7 @@ def process(ai_analyze: bool = False, batch: int = 50, target_product: str = Non
     conn.close()
 
 @app.command()
-def report(product: str, mode: str = "DIRECT_FIT", limit: int = 15):
+def report(product: str, mode: str = "DIRECT_FIT", limit: int = 15, user_id: str = None):
     """Generate a calibrated report using different discovery modes."""
     from radar.storage.db import get_connection
     import pandas as pd
@@ -222,7 +230,12 @@ def report(product: str, mode: str = "DIRECT_FIT", limit: int = 15):
         console.print(f"[yellow]No posts found for mode {mode}. Try a different mode.[/yellow]")
         return
         
-    output_path = f"outputs/reports/{product}_{mode.lower()}_report.md"
+    import os
+    user_subdir = f"{user_id}" if user_id else "global"
+    output_dir = os.path.join("outputs", "reports", user_subdir)
+    os.makedirs(output_dir, exist_ok=True)
+    
+    output_path = os.path.join(output_dir, f"{product}_{mode.lower()}_report.md")
     with open(output_path, "w", encoding="utf-8") as f:
         f.write(f"# Radar Report: {product.capitalize()} ({mode})\n\n")
         f.write(f"> **Mode**: {mode}\n")

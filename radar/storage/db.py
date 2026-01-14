@@ -256,20 +256,24 @@ def save_analysis(post_id: str, product_id: str, user_id: str, data: Dict[str, A
     query = """
     INSERT INTO post_analysis (
         post_id, product_id, user_id, relevance_score, semantic_similarity, 
-        community_score, ai_analysis, signals_json, updated_at
-    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP)
+        community_score, ai_analysis, signals_json, updated_at,
+        last_processed_score, last_processed_comments
+    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP, ?, ?)
     ON CONFLICT(post_id, product_id, user_id) DO UPDATE SET
         relevance_score = excluded.relevance_score,
         semantic_similarity = excluded.semantic_similarity,
         community_score = excluded.community_score,
         ai_analysis = excluded.ai_analysis,
         signals_json = excluded.signals_json,
+        last_processed_score = excluded.last_processed_score,
+        last_processed_comments = excluded.last_processed_comments,
         updated_at = CURRENT_TIMESTAMP
     """
     params = (
         post_id, product_id, user_id, data.get('relevance_score', 0),
         data.get('semantic_similarity', 0), data.get('community_score', 0),
-        data.get('ai_analysis'), data.get('signals_json')
+        data.get('ai_analysis'), data.get('signals_json'),
+        data.get('last_processed_score', -1), data.get('last_processed_comments', -1)
     )
     
     if cursor:
@@ -340,14 +344,32 @@ def get_analysis(post_id: str, product_id: str, user_id: str = None):
     conn.close()
     return dict(row) if row else None
 
-def get_unprocessed_posts(subreddit_filter: List[str] = None, limit: int = None, force: bool = False):
+def get_unprocessed_posts(subreddit_filter: List[str] = None, limit: int = None, force: bool = False, user_id: str = None, product_id: str = None):
     conn = get_connection()
     conn.row_factory = sqlite3.Row
     cursor = conn.cursor()
     
+    params = []
+    
     if force:
         query = "SELECT * FROM posts"
+    elif user_id and product_id and product_id != "all":
+        # Multi-tenant logic: Get posts that:
+        # 1. Need global embedding (p.embedding_id IS NULL)
+        # 2. Don't have an analysis for this SPECIFIC product/user (pa.post_id IS NULL)
+        # 3. Metrics changed since THIS user last analyzed it 
+        query = """
+            SELECT p.* FROM posts p
+            LEFT JOIN post_analysis pa ON p.id = pa.post_id 
+                AND pa.product_id = ? AND pa.user_id = ?
+            WHERE (p.embedding_id IS NULL 
+            OR pa.post_id IS NULL 
+            OR p.score != pa.last_processed_score 
+            OR p.num_comments != pa.last_processed_comments)
+        """
+        params.extend([product_id, user_id])
     else:
+        # Legacy/Global logic: Get posts that need embedding or global score update
         query = """
             SELECT * FROM posts 
             WHERE (embedding_id IS NULL 
@@ -355,15 +377,14 @@ def get_unprocessed_posts(subreddit_filter: List[str] = None, limit: int = None,
             OR num_comments != last_processed_comments)
         """
     
-    params = []
-    
     # Subreddit filter
     if subreddit_filter:
         placeholders = ', '.join(['?'] * len(subreddit_filter))
+        condition = f"source IN ({placeholders})"
         if "WHERE" in query:
-            query += f" AND source IN ({placeholders})"
+            query += f" AND p.{condition}" if "p." in query else f" AND {condition}"
         else:
-            query += f" WHERE source IN ({placeholders})"
+            query += f" WHERE p.{condition}" if "p." in query else f" WHERE {condition}"
         params.extend(subreddit_filter)
         
     # Limit
@@ -373,25 +394,12 @@ def get_unprocessed_posts(subreddit_filter: List[str] = None, limit: int = None,
         
     try:
         cursor.execute(query, params)
-    except sqlite3.OperationalError:
-        # Fallback if columns don't exist yet
+    except sqlite3.OperationalError as e:
+        # Fallback for older schemas or missing columns
+        print(f"DEBUG: DB Query failed ({e}), falling back...")
         fallback_query = "SELECT * FROM posts WHERE embedding_id IS NULL"
         if force: fallback_query = "SELECT * FROM posts"
-        
-        if subreddit_filter:
-            placeholders = ', '.join(['?'] * len(subreddit_filter))
-            fallback_query += f" AND source IN ({placeholders})"
-            if limit:
-                fallback_query += " LIMIT ?"
-                cursor.execute(fallback_query, params)
-            else:
-                cursor.execute(fallback_query, params)
-        else:
-            if limit:
-                fallback_query += " LIMIT ?"
-                cursor.execute(fallback_query, (limit,))
-            else:
-                cursor.execute(fallback_query)
+        cursor.execute(fallback_query)
     
     rows = cursor.fetchall()
     conn.commit()
