@@ -792,10 +792,10 @@ function MainApp() {
         if (res.data.is_running) {
           setSyncing(true);
           setSyncStatus(res.data);
+          // If already running, fetch history to sync the sidebar status too
+          fetchHistory();
         }
-      } catch (err) {
-
-      }
+      } catch (err) { }
     };
     checkSyncStatus();
 
@@ -809,23 +809,35 @@ function MainApp() {
   useEffect(() => {
     let interval;
     if (syncing) {
-      interval = setInterval(async () => {
+      // Immediate fetch on start/reload to avoid 5s delay
+      const poll = async () => {
         try {
           const headers = await getAuthHeaders();
+          // If headers is empty (token missing), skip this tick but don't stop syncing
+          if (Object.keys(headers).length === 0) return;
+
           const res = await axios.get(`${API_BASE}/api/sync/status`, { headers });
           setSyncStatus(res.data);
-          if (!res.data.is_running) {
+
+          // Also refresh history during sync to see status changes in sidebar
+          fetchHistory();
+
+          // Only stop if explicitly Success or Error, or if the backend says definitely not running
+          // AND we haven't just had a transient error
+          if (!res.data.is_running && (res.data.progress === 100 || res.data.error)) {
             setSyncing(false);
-            if (res.data.progress === 100) {
-              fetchThreads();
-              fetchHistory();
-            }
+            fetchThreads();
+            fetchHistory(); // Final refresh
             clearInterval(interval);
           }
         } catch (err) {
-
+          // On network error, keep syncing state true to avoid unlocking button prematurely
+          console.error("Polling error, continuing...", err);
         }
-      }, 1000);
+      };
+
+      poll();
+      interval = setInterval(poll, 5000);
     }
     return () => clearInterval(interval);
   }, [syncing]);
@@ -941,16 +953,18 @@ function MainApp() {
       return;
     }
     setSyncing(true);
+    setSyncStatus({ is_running: true, current_step: "Starting...", progress: 0 });
     try {
       const headers = await getAuthHeaders();
       const subParams = selectedSubs.map(s => `subreddits=${s}`).join('&');
       const url = `${API_BASE}/api/sync?${subParams}&days=${days}&product=${selectedProduct}`;
-      const res = await axios.post(url, {}, { headers });
+      await axios.post(url, {}, { headers });
       fetchHistory();
       fetchConfig();
     } catch (err) {
       alert("Sync failed: " + (err.response?.data?.error || err.message));
       setSyncing(false);
+      setSyncStatus({ is_running: false, current_step: "Idle", progress: 0 });
     }
   };
 
