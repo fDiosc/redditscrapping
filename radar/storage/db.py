@@ -312,12 +312,14 @@ def update_triage_status(user_id: str, product_id: str, post_id: str, status: st
         """, (status, rel, sem, post_id, product_id, user_id))
         
         # 3. Log into triage_history for future AI training
+        # Map None to 'null' for history because of NOT NULL constraint
+        history_status = status if status is not None else "null"
         cursor.execute("""
             INSERT INTO triage_history (
                 post_id, product_id, user_id, status, 
                 relevance_score, semantic_similarity, community_score, ai_analysis_snapshot
             ) VALUES (?, ?, ?, ?, ?, ?, ?, ?)
-        """, (post_id, product_id, user_id, status, rel, sem, com, ai))
+        """, (post_id, product_id, user_id, history_status, rel, sem, com, ai))
         
     conn.commit()
     conn.close()
