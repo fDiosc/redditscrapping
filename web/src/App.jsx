@@ -942,6 +942,8 @@ function MainApp() {
       const subParams = selectedSubs.map(s => `subreddits=${s}`).join('&');
       const url = `${API_BASE}/api/sync?${subParams}&days=${days}&product=${selectedProduct}`;
       const res = await axios.post(url, {}, { headers });
+      fetchHistory();
+      fetchConfig();
     } catch (err) {
       alert("Sync failed: " + (err.response?.data?.error || err.message));
       setSyncing(false);
@@ -1096,9 +1098,10 @@ function MainApp() {
                           </div>
                           <div className="flex justify-between items-center">
                             <span className="text-[9px] text-slate-400 truncate w-1/2 font-medium">r/{run.subreddits}</span>
-                            <span className={`text-[8px] px-2 py-0.5 rounded-full font-black uppercase tracking-widest ${run.status === 'Success' ? 'bg-emerald-500/10 text-emerald-500' :
+                            <span className={`text-[8px] px-2 py-0.5 rounded-full font-black uppercase tracking-widest flex items-center gap-1.5 ${run.status === 'Success' ? 'bg-emerald-500/10 text-emerald-500' :
                               run.status.startsWith('Error') ? 'bg-red-500/10 text-red-500' : 'bg-indigo-500/10 text-indigo-400'
                               }`}>
+                              {run.status !== 'Success' && !run.status.startsWith('Error') && <RefreshCw size={8} className="animate-spin" />}
                               {run.status.split(':')[0]}
                             </span>
                           </div>

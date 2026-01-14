@@ -118,7 +118,8 @@ async def get_sync_status(user_id: str = Depends(get_current_user)):
         return {"is_running": False, "current_step": "Idle", "progress": 0}
     
     latest = history[0]
-    is_running = latest['status'] in ['Running', 'Ingesting', 'Processing', 'Initializing']
+    status = latest['status']
+    is_running = status != 'Success' and not status.startswith('Error')
     
     return {
         "is_running": is_running,
@@ -152,8 +153,11 @@ async def sync_data(
 
     # Check if this specific user has a run in progress
     history = get_sync_history(user_id, limit=1)
-    if history and history[0]['status'] in ['Running', 'Ingesting', 'Processing', 'Initializing']:
-        return {"error": "Sync already in progress for your account", "status": history[0]}
+    if history:
+        status = history[0]['status']
+        is_active = status != 'Success' and not status.startswith('Error')
+        if is_active:
+            return {"error": "Sync already in progress for your account", "status": history[0]}
 
     run_id = add_sync_run(user_id, product or "all", subreddits, days)
 
