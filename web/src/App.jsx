@@ -695,6 +695,10 @@ function MainApp() {
   // Helper to get auth headers
   const getAuthHeaders = async () => {
     const token = await getToken();
+    if (!token) {
+      console.warn("No auth token available");
+      return {};
+    }
     return { Authorization: `Bearer ${token}` };
   };
 

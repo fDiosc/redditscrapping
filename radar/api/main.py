@@ -111,7 +111,17 @@ async def triage_thread(
     return {"status": "success", "triage": status}
 
 @app.get("/api/sync/status")
-async def get_sync_status(user_id: str = Depends(get_current_user)):
+async def get_sync_status(user_id: Optional[str] = Depends(get_optional_user)):
+    if not user_id:
+        # Check if there's any active run globally just for debug, 
+        # but normally we want this to be per-user.
+        return {
+            "is_running": False, 
+            "current_step": "Authentication required", 
+            "progress": 0,
+            "error": "Unauthorized"
+        }
+        
     from radar.storage.db import get_sync_history
     history = get_sync_history(user_id, limit=1)
     if not history:

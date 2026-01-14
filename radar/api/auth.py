@@ -96,20 +96,26 @@ async def get_current_user(
     token = credentials.credentials
     
     try:
+        if token == "null" or not token:
+            print("AUTH DEBUG: Token is missing or 'null'")
+            raise HTTPException(status_code=401, detail="Token missing")
+
         jwks = await get_clerk_jwks()
         payload = verify_clerk_token(token, jwks)
         
         # Clerk uses 'sub' for user ID
         user_id = payload.get("sub")
         if not user_id:
+            print("AUTH DEBUG: User ID (sub) not found in token payload")
             raise HTTPException(status_code=401, detail="User ID not found in token")
         
         return user_id
         
-    except HTTPException:
+    except HTTPException as e:
+        print(f"AUTH DEBUG: HTTPException {e.status_code}: {e.detail}")
         raise
     except Exception as e:
-        print(f"Auth error: {e}")
+        print(f"AUTH DEBUG: Unexpected auth error: {e}")
         raise HTTPException(status_code=401, detail="Authentication failed")
 
 
