@@ -20,7 +20,9 @@ dependencies = [
     "python-jose[cryptography]",
     "httpx",
     "tiktoken",
-    "curl_cffi"
+    "curl_cffi",
+    "pytest",
+    "pytest-asyncio"
 ]
 
 [tool.setuptools]
