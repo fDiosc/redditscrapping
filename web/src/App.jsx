@@ -681,7 +681,7 @@ function MainApp() {
   const [syncing, setSyncing] = useState(false);
   const [syncStatus, setSyncStatus] = useState({ is_running: false, current_step: "Idle", progress: 0 });
   const [expandedThread, setExpandedThread] = useState(null);
-  const [sortBy, setSortBy] = useState("relevance");
+  const [sortBy, setSortBy] = useState("highest");
   const [history, setHistory] = useState([]);
   const [view, setView] = useState("dashboard");
   const [products, setProducts] = useState([]);
@@ -914,8 +914,12 @@ function MainApp() {
   };
 
   const sortedThreads = [...threads].sort((a, b) => {
-    if (sortBy === "intensity") return b.community_score - a.community_score;
-    if (sortBy === "fit") return b.semantic_similarity - a.semantic_similarity;
+    if (sortBy === "newest") {
+      return new Date(b.created_at) - new Date(a.created_at);
+    }
+    // Default to "highest" logic
+    if (activeFilter === "intensity" || sortBy === "intensity") return b.community_score - a.community_score;
+    if (activeFilter === "fit" || sortBy === "fit") return b.semantic_similarity - a.semantic_similarity;
     return b.relevance_score - a.relevance_score;
   });
 
@@ -1166,7 +1170,7 @@ function MainApp() {
                       onClick={() => {
                         const newVal = activeFilter === "intensity" ? "all" : "intensity";
                         setActiveFilter(newVal);
-                        setSortBy(newVal === "intensity" ? "intensity" : "relevance");
+                        setSortBy("highest");
                       }}
                       className={`p-5 rounded-2xl border transition-all cursor-pointer flex items-center justify-between shadow-sm ${activeFilter === "intensity" ? "bg-indigo-600 border-indigo-400 shadow-indigo-500/20" : "bg-slate-900 border-slate-800 hover:border-indigo-500/30"
                         }`}
@@ -1188,7 +1192,7 @@ function MainApp() {
                       onClick={() => {
                         const newVal = activeFilter === "fit" ? "all" : "fit";
                         setActiveFilter(newVal);
-                        setSortBy(newVal === "fit" ? "fit" : "relevance");
+                        setSortBy("highest");
                       }}
                       className={`p-5 rounded-2xl border transition-all cursor-pointer flex items-center justify-between shadow-sm ${activeFilter === "fit" ? "bg-indigo-600 border-indigo-400 shadow-indigo-500/20" : "bg-slate-900 border-slate-800 hover:border-indigo-500/30"
                         }`}
@@ -1210,7 +1214,7 @@ function MainApp() {
                       onClick={() => {
                         const newVal = activeFilter === "score" ? "all" : "score";
                         setActiveFilter(newVal);
-                        setSortBy("relevance");
+                        setSortBy("highest");
                       }}
                       className={`p-5 rounded-2xl border transition-all cursor-pointer flex items-center justify-between shadow-sm ${activeFilter === "score" ? "bg-indigo-600 border-indigo-400 shadow-indigo-500/20" : "bg-slate-900 border-slate-800 hover:border-indigo-500/30"
                         }`}
@@ -1262,22 +1266,16 @@ function MainApp() {
 
                     <div className="flex bg-slate-900 p-1 rounded-lg border border-slate-800">
                       <button
-                        onClick={() => setSortBy("relevance")}
-                        className={`px-4 py-1.5 rounded-md text-xs font-bold transition-all ${sortBy === "relevance" ? "bg-indigo-600 text-white" : "text-slate-500 hover:text-slate-300"}`}
+                        onClick={() => setSortBy("highest")}
+                        className={`px-4 py-1.5 rounded-md text-xs font-bold transition-all ${sortBy === "highest" ? "bg-indigo-600 text-white" : "text-slate-500 hover:text-slate-300"}`}
                       >
-                        Sort by Score
+                        Sort by Highest
                       </button>
                       <button
-                        onClick={() => setSortBy("fit")}
-                        className={`px-4 py-1.5 rounded-md text-xs font-bold transition-all ${sortBy === "fit" ? "bg-indigo-600 text-white" : "text-slate-500 hover:text-slate-300"}`}
+                        onClick={() => setSortBy("newest")}
+                        className={`px-4 py-1.5 rounded-md text-xs font-bold transition-all ${sortBy === "newest" ? "bg-indigo-600 text-white" : "text-slate-500 hover:text-slate-300"}`}
                       >
-                        Sort by Fit
-                      </button>
-                      <button
-                        onClick={() => setSortBy("intensity")}
-                        className={`px-4 py-1.5 rounded-md text-xs font-bold transition-all ${sortBy === "intensity" ? "bg-indigo-600 text-white" : "text-slate-500 hover:text-slate-300"}`}
-                      >
-                        Sort by Intensity
+                        Sort by Newest
                       </button>
                     </div>
                   </div>
