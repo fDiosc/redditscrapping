@@ -4,7 +4,7 @@ from typing import List, Optional, Any
 from pydantic import BaseModel
 from radar.models.response import GenerateResponseRequest, FeedbackRequest
 from radar.services.response_service import ResponseGenerator
-from radar.api.auth import get_current_user
+from radar.api.auth import get_current_user, get_optional_user
 import os
 import json
 from radar.storage.db import get_connection
