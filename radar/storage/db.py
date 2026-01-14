@@ -101,6 +101,7 @@ def init_db():
         embedding_id TEXT,
         created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
         updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        website_url TEXT,
         PRIMARY KEY (id, user_id)
     )
     """)
@@ -197,6 +198,13 @@ def init_db():
             print(f"DEBUG: Added {col_name} column to {table}")
         except sqlite3.OperationalError:
             pass  # Already exists
+
+    # Migration: add website_url to products
+    try:
+        cursor.execute("ALTER TABLE products ADD COLUMN website_url TEXT")
+        conn.commit()
+    except sqlite3.OperationalError:
+        pass
 
     conn.close()
 
@@ -497,8 +505,8 @@ def save_product_record(product_data: Dict[str, Any]):
     cursor.execute("""
     INSERT OR REPLACE INTO products (
         id, user_id, name, description, pain_signals, intent_signals, 
-        target_subreddits, embedding_context, embedding_id, updated_at
-    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP)
+        target_subreddits, embedding_context, embedding_id, updated_at, website_url
+    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP, ?)
     """, (
         product_data['id'],
         product_data['user_id'],
@@ -508,7 +516,8 @@ def save_product_record(product_data: Dict[str, Any]):
         intent_signals,
         target_subreddits,
         product_data.get('embedding_context'),
-        product_data.get('embedding_id')
+        product_data.get('embedding_id'),
+        product_data.get('website_url')
     ))
     
     conn.commit()

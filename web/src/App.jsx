@@ -155,7 +155,8 @@ const ProductModal = ({ isOpen, onClose, onSave, product }) => {
     description: "",
     pain_signals: [],
     intent_signals: [],
-    target_subreddits: []
+    target_subreddits: [],
+    website_url: ""
   });
 
   useEffect(() => {
@@ -167,7 +168,7 @@ const ProductModal = ({ isOpen, onClose, onSave, product }) => {
         target_subreddits: typeof product.target_subreddits === 'string' ? JSON.parse(product.target_subreddits) : product.target_subreddits,
       });
     } else {
-      setFormData({ name: "", description: "", pain_signals: [], intent_signals: [], target_subreddits: [] });
+      setFormData({ name: "", description: "", pain_signals: [], intent_signals: [], target_subreddits: [], website_url: "" });
     }
   }, [product, isOpen]);
 
@@ -248,6 +249,16 @@ const ProductModal = ({ isOpen, onClose, onSave, product }) => {
               value={formData.name}
               onChange={e => setFormData({ ...formData, name: e.target.value })}
               placeholder="e.g. ProfitDoctor"
+            />
+          </div>
+
+          <div className="space-y-2">
+            <label className="text-xs font-bold text-slate-500 uppercase">Website URL (For direct recommendations)</label>
+            <input
+              className="w-full bg-slate-800 border border-slate-700 rounded-lg p-3 text-white outline-none focus:ring-2 focus:ring-indigo-500"
+              value={formData.website_url || ""}
+              onChange={e => setFormData({ ...formData, website_url: e.target.value })}
+              placeholder="https://profitdoctor.app"
             />
           </div>
 
@@ -361,6 +372,16 @@ const ProductManagement = ({ products, onEdit, onDelete, onCreate }) => {
 
               <div>
                 <h3 className="text-xl font-bold text-white uppercase tracking-tight">{p.name || p.id}</h3>
+                {p.website_url && (
+                  <a
+                    href={p.website_url.startsWith('http') ? p.website_url : `https://${p.website_url}`}
+                    target="_blank"
+                    rel="noreferrer"
+                    className="text-[10px] text-indigo-400 hover:text-indigo-300 font-bold flex items-center gap-1 mt-0.5"
+                  >
+                    {p.website_url.replace(/^https?:\/\//, '')} <ExternalLink size={10} />
+                  </a>
+                )}
                 <p className="text-sm text-slate-400 line-clamp-2 mt-1">{p.description}</p>
               </div>
 
@@ -450,7 +471,8 @@ const ResponseCard = ({ response, postUrl, onRegenerate, availableStyles, loadin
     helpful_expert: '🎓 Helpful Expert',
     casual: '😊 Casual',
     technical: '🔧 Technical',
-    brief: '⚡ Brief'
+    brief: '⚡ Brief',
+    product_referral: '🚀 Product Referral'
   };
 
   const handleCopy = async () => {
@@ -1424,7 +1446,7 @@ function MainApp() {
                                         productId={selectedProduct}
                                         loading={thread.isRegenerating}
                                         error={thread.genError}
-                                        availableStyles={['empathetic', 'helpful_expert', 'casual', 'technical', 'brief']}
+                                        availableStyles={['empathetic', 'helpful_expert', 'casual', 'technical', 'brief', 'product_referral']}
                                         onRegenerate={(style) => {
                                           const handleGen = async () => {
                                             setThreads(prev => prev.map(t =>

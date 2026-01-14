@@ -7,25 +7,24 @@ from radar.storage.db import get_post, get_product, get_analysis, save_generated
 logger = logging.getLogger(__name__)
 
 RESPONSE_SYSTEM_PROMPT = """You are a helpful Reddit community member who genuinely wants to help others.
-You have experience with {product_name} but you NEVER directly promote it or mention it by name.
+{referral_guidance}
 
 Your responses must:
 1. Feel authentic and human - NOT like marketing copy or AI-generated
 2. Provide genuine value and insight FIRST
 3. Show empathy by referencing their specific situation
-4. Only hint at solutions existing after establishing connection
-5. End with an engaging question to continue the conversation
-6. Be 80-150 words (Reddit sweet spot for engagement)
-7. SOUND LIKE A HUMAN TYPING: Use natural flow, occasional lowercase at start of sentences, and casual sentence structures.
-8. NO HYPHENS: Strictly avoid using the hyphen character (-) anywhere in your response text. Use commas, periods, or just start new lines instead.
+4. End with an engaging question to continue the conversation
+5. Be 80-150 words (Reddit sweet spot for engagement)
+6. SOUND LIKE A HUMAN TYPING: Use natural flow, occasional lowercase at start of sentences, and casual sentence structures.
+7. NO HYPHENS: Strictly avoid using the hyphen character (-) anywhere in your response text. Use commas, periods, or just start new lines instead.
 
 CRITICAL RULES - NEVER BREAK THESE:
-* NEVER say "I work for [product]" or "You should try [product]"
+* {primary_promotion_rule}
 * NEVER use marketing phrases like "game-changer", "revolutionary", "amazing tool"
 * NEVER start with "Hey there!" or "Great question!" (too generic)
 * NEVER use bullet points or formatted lists (not natural for Reddit)
 * DO reference their specific words/situation to show you read their post
-* DO share genuine experiences and subtle hints about solutions
+* DO share genuine experiences
 * DO sound like a real person who's been in their shoes
 * DO use casual language, contractions, and occasional typos feel OK
 * REMEMBER: NO HYPHENS (-) IN THE FINAL CONTENT.
@@ -63,6 +62,12 @@ Focus: Quick value, no fluff
 Voice: Like a busy person giving their best tip
 Length: 40-80 words max
 Example phrases: "Quick tip:", "Honestly just", "The move is"
+""",
+    "product_referral": """
+Tone: Recommending, helpful, direct
+Focus: Solving the user's problem by suggesting the product specifically
+Voice: Someone who found a great tool and wants to share it
+Example phrases: "I've been using {product_name}", "Check out {website_url}", "This actually solves exactly that"
 """
 }
 
@@ -118,7 +123,21 @@ If the source is the "Main Post", address the original author's post.
 
 Write the response now (plain text, no markdown formatting):"""
 
-        system_content = RESPONSE_SYSTEM_PROMPT.format(product_name=product['name'])
+        if style == "product_referral":
+            referral_guidance = f"You are a big fan of {product['name']} and you want to recommend it directly because it solves the user's problem. You should mention the product name and its website ({product.get('website_url', 'the product website')}) naturally."
+            primary_promotion_rule = f"DO mention that you use {product['name']} and give the link if it helps."
+        else:
+            referral_guidance = f"You have experience with {product['name']} but you NEVER directly promote it or mention it by name in this specific response style."
+            primary_promotion_rule = "NEVER say 'I work for [product]' or 'You should try [product]'"
+
+        system_content = RESPONSE_SYSTEM_PROMPT.format(
+            product_name=product['name'],
+            referral_guidance=referral_guidance,
+            primary_promotion_rule=primary_promotion_rule
+        )
+        
+        # Also ensure product name and url are available in the style modifier if needed
+        style_mod = style_mod.format(product_name=product['name'], website_url=product.get('website_url', ''))
 
         try:
             # Using GPT-5.2 flagship with x-high reasoning effort as per docs
