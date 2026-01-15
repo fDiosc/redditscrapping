@@ -82,6 +82,42 @@ def analyze_users():
     table.add_row("4. Power Users (AI/Triage)", str(power_users), conv_power)
 
     console.print(table)
+
+    # --- LIST IDs ---
+    console.print("\n[bold cyan]📋 User IDs by Category[/bold cyan]")
+    
+    cursor.execute("""
+        SELECT DISTINCT user_id FROM products 
+        UNION SELECT user_id FROM user_settings 
+        UNION SELECT user_id FROM sync_runs
+    """)
+    all_ids = [r[0] for r in cursor.fetchall()]
+
+    cursor.execute("SELECT DISTINCT user_id FROM products")
+    prod_ids = [r[0] for r in cursor.fetchall()]
+
+    cursor.execute("SELECT DISTINCT p.user_id FROM products p JOIN sync_runs s ON p.user_id = s.user_id")
+    ana_ids = [r[0] for r in cursor.fetchall()]
+
+    cursor.execute("""
+        SELECT DISTINCT p.user_id FROM products p JOIN sync_runs s ON p.user_id = s.user_id
+        WHERE p.user_id IN (SELECT user_id FROM generated_responses UNION SELECT user_id FROM triage_history)
+    """)
+    power_ids = [r[0] for r in cursor.fetchall()]
+
+    console.print(f"\n[yellow]1. All Active IDs ({len(all_ids)}):[/yellow]")
+    console.print(", ".join(all_ids))
+
+    console.print(f"\n[yellow]2. Created Product ({len(prod_ids)}):[/yellow]")
+    console.print(", ".join(prod_ids))
+
+    console.print(f"\n[yellow]3. Ran Analysis ({len(ana_ids)}):[/yellow]")
+    console.print(", ".join(ana_ids))
+
+    console.print(f"\n[yellow]4. Power Users ({len(power_ids)}):[/yellow]")
+    console.print(", ".join(power_ids) if power_ids else "None")
+
+    console.print("\n[dim]Note: Copy these IDs and check them in your Clerk Dashboard to see emails.[/dim]")
     conn.close()
 
 if __name__ == "__main__":
