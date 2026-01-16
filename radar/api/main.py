@@ -1,5 +1,6 @@
-from fastapi import FastAPI, BackgroundTasks, Query, HTTPException, Depends
+from fastapi import FastAPI, BackgroundTasks, Query, HTTPException, Depends, Request
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import JSONResponse
 from typing import List, Optional, Any
 from pydantic import BaseModel
 from radar.models.response import GenerateResponseRequest, FeedbackRequest
@@ -15,7 +16,25 @@ from radar.process.ai_analysis import analyze_post_with_ai
 # Import other CLI logics directly if possible, or wrap them
 from radar.cli import process as cli_process
 
+# Rate Limiting with slowapi
+try:
+    from slowapi import Limiter, _rate_limit_exceeded_handler
+    from slowapi.util import get_remote_address
+    from slowapi.errors import RateLimitExceeded
+    
+    limiter = Limiter(key_func=get_remote_address)
+    RATE_LIMITING_ENABLED = True
+except ImportError:
+    # slowapi not installed, disable rate limiting
+    limiter = None
+    RATE_LIMITING_ENABLED = False
+
 app = FastAPI(title="SonarPro AI API")
+
+# Configure rate limiting if available
+if RATE_LIMITING_ENABLED:
+    app.state.limiter = limiter
+    app.add_exception_handler(RateLimitExceeded, _rate_limit_exceeded_handler)
 
 # Initialize database on startup
 @app.on_event("startup")
@@ -122,7 +141,9 @@ async def get_sync_status(user_id: Optional[str] = Depends(get_optional_user)):
             "error": "Unauthorized"
         }
         
-    from radar.storage.db import get_sync_history
+    from radar.storage.db import get_sync_history, update_sync_run_status
+    from datetime import datetime, timedelta
+    
     history = get_sync_history(user_id, limit=1)
     if not history:
         return {"is_running": False, "current_step": "Idle", "progress": 0}
@@ -130,6 +151,26 @@ async def get_sync_status(user_id: Optional[str] = Depends(get_optional_user)):
     latest = history[0]
     status = latest['status']
     is_running = status != 'Success' and not status.startswith('Error')
+    
+    # STUCK SYNC DETECTION: If running for more than 15 minutes, consider it stuck
+    if is_running:
+        try:
+            # Parse timestamp and check if it's older than 15 minutes
+            sync_time = datetime.fromisoformat(latest['timestamp'].replace('Z', '+00:00'))
+            now = datetime.now(sync_time.tzinfo) if sync_time.tzinfo else datetime.now()
+            
+            if now - sync_time > timedelta(minutes=15):
+                # Mark as timed out
+                update_sync_run_status(latest['id'], "Error: Sync timed out", 0)
+                return {
+                    "is_running": False,
+                    "current_step": "Sync timed out - try again",
+                    "progress": 0,
+                    "was_stuck": True
+                }
+        except (ValueError, TypeError, KeyError):
+            # If we can't parse the timestamp, just continue
+            pass
     
     return {
         "is_running": is_running,
@@ -150,6 +191,7 @@ async def get_sync_history_api(user_id: str = Depends(get_current_user), limit: 
 
 @app.post("/api/sync")
 async def sync_data(
+    request: Request,
     background_tasks: BackgroundTasks,
     user_id: str = Depends(get_current_user),
     subreddits: List[str] = Query(...),
@@ -293,3 +335,73 @@ async def save_setting_api(req: SettingRequest, user_id: str = Depends(get_curre
     from radar.storage.db import save_user_setting
     save_user_setting(user_id, req.key, req.value)
     return {"status": "ok"}
+
+
+# ============================================
+# Smart Product Setup Endpoints
+# ============================================
+
+class URLExtractionRequest(BaseModel):
+    url: str
+
+@app.post("/api/extract/url")
+async def extract_product_from_url(request: Request, url_request: URLExtractionRequest, user_id: str = Depends(get_current_user)):
+    """Extract product information from a website URL using AI."""
+    from radar.services.product_extractor import ProductExtractor
+    
+    extractor = ProductExtractor()
+    try:
+        result = await extractor.extract_from_url(url_request.url)
+        
+        if "error" in result:
+            raise HTTPException(status_code=400, detail=result["error"])
+        
+        return result
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Extraction failed: {str(e)}")
+
+
+class SubredditSuggestionRequest(BaseModel):
+    category: str
+    pain_signals: Optional[List[str]] = None
+    intent_signals: Optional[List[str]] = None
+
+@app.post("/api/subreddits/suggest")
+async def suggest_subreddits_api(request: SubredditSuggestionRequest, user_id: str = Depends(get_current_user)):
+    """Suggest relevant subreddits based on product category and signals."""
+    from radar.services.product_extractor import suggest_subreddits
+    
+    suggestions = suggest_subreddits(
+        request.category,
+        request.pain_signals,
+        request.intent_signals
+    )
+    
+    return {"suggestions": suggestions}
+
+
+# ============================================
+# Infrastructure Endpoints
+# ============================================
+
+@app.get("/health")
+async def health_check():
+    """Health check endpoint for monitoring."""
+    from datetime import datetime
+    
+    # Check database connection
+    try:
+        conn = get_connection()
+        conn.execute("SELECT 1")
+        conn.close()
+        db_status = "healthy"
+    except Exception as e:
+        db_status = f"unhealthy: {str(e)}"
+    
+    return {
+        "status": "healthy" if db_status == "healthy" else "degraded",
+        "database": db_status,
+        "timestamp": datetime.utcnow().isoformat()
+    }

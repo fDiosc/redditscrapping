@@ -2,6 +2,10 @@ from typing import List, Dict, Any
 
 def count_tokens(text: str, model: str = "gpt-4o-mini") -> int:
     """Returns the number of tokens, falls back to character count estimate if tiktoken fails."""
+    # Handle None input
+    if text is None:
+        return 0
+        
     try:
         import tiktoken
         try:
@@ -12,15 +16,15 @@ def count_tokens(text: str, model: str = "gpt-4o-mini") -> int:
     except Exception as e:
         # Fallback for missing tiktoken or no internet on first load
         # Average English word is ~4.5 chars, OpenAI says 1 token ~= 4 chars
-        return len(text) // 4
+        return len(text) // 4 if text else 0
 
 def build_unified_context(post: Dict[str, Any], comments: List[Dict[str, Any]], max_tokens: int = 7500) -> str:
     """
     Builds a unified context string while respecting token limits.
     Priority: Title > Body > Top Comments (sorted by score).
     """
-    title = post.get('title', '')
-    body = post.get('body', '')
+    title = post.get('title', '') or ''
+    body = post.get('body', '') or ''  # Handle None values
     
     # 1. Reserve space for Title and basic structure
     header = f"TITLE: {title}\nAUTHOR: {post.get('author', 'unknown')}\n"
@@ -48,7 +52,7 @@ def build_unified_context(post: Dict[str, Any], comments: List[Dict[str, Any]], 
     # 3. Add Comments (Sorted by score)
     comments_included = 0
     for cmd in comments:
-        cmd_text = f"COMMENT BY u/{cmd.get('author', 'unknown')}: {cmd['body']}\n"
+        cmd_text = f"COMMENT BY u/{cmd.get('author', 'unknown')}: {cmd.get('body', '') or ''}\n"
         cmd_tokens = count_tokens(cmd_text)
         
         if current_tokens + cmd_tokens > max_tokens:

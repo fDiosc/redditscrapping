@@ -73,45 +73,192 @@ const Tooltip = ({ text, children }) => {
   );
 };
 
-const OnboardingWizard = ({ steps, onComplete }) => {
+// Interactive Onboarding - Guides users through first product creation
+const InteractiveOnboarding = ({ onComplete, onOpenProductModal, hasProducts, onStartSync }) => {
   const [currentStep, setCurrentStep] = useState(0);
+  const [isAnimating, setIsAnimating] = useState(false);
+
+  const steps = [
+    {
+      id: 'welcome',
+      title: "Welcome to SonarPro! 🚀",
+      subtitle: "Let's find your first leads in under 5 minutes",
+      content: "SonarPro uses AI to scan Reddit and find people who need exactly what you're selling. No cold emails, no ads, just genuine conversations.",
+      action: null,
+      actionLabel: "Let's Go",
+      icon: <Radar className="text-purple-400" size={32} />,
+    },
+    {
+      id: 'product',
+      title: "Set Up Your Product",
+      subtitle: "Tell us what you're selling",
+      content: hasProducts
+        ? "Great! You already have a product configured. You can add more later in Product Settings."
+        : "Click below to add your first product. Pro tip: paste your website URL and we'll fill in the details automatically!",
+      action: hasProducts ? null : () => onOpenProductModal(),
+      actionLabel: hasProducts ? "Continue" : "Add Your Product",
+      icon: <PlusCircle className="text-indigo-400" size={32} />,
+      skipIf: hasProducts,
+    },
+    {
+      id: 'subreddits',
+      title: "Choose Your Hunting Grounds",
+      subtitle: "Where does your audience hang out?",
+      content: "Select the subreddits where your ideal customers discuss their problems. We'll suggest some based on your product category.",
+      action: null,
+      actionLabel: "Continue",
+      icon: <Globe className="text-cyan-400" size={32} />,
+    },
+    {
+      id: 'sync',
+      title: "Run Your First Scan",
+      subtitle: "Let's find some leads!",
+      content: "Click 'Run Intelligence Sync' in the sidebar to start scanning Reddit. This takes 2-3 minutes depending on how many subreddits you selected.",
+      action: () => onStartSync(),
+      actionLabel: "Start Scanning",
+      icon: <Activity className="text-emerald-400" size={32} />,
+    },
+    {
+      id: 'complete',
+      title: "You're All Set! 🎉",
+      subtitle: "Time to make some sales",
+      content: "Once the scan completes, you'll see leads ranked by relevance. Click on any lead to see AI insights and generate a personalized response.",
+      action: null,
+      actionLabel: "Start Closing Deals",
+      icon: <CheckCircle className="text-green-400" size={32} />,
+    }
+  ];
+
   const step = steps[currentStep];
+  const totalSteps = steps.length;
+
+  const handleNext = () => {
+    // For product step without products, just open modal and don't advance
+    if (step.id === 'product' && !hasProducts) {
+      onOpenProductModal();
+      return;
+    }
+
+    // Execute any other step action
+    if (step.action) {
+      step.action();
+    }
+
+    if (currentStep === totalSteps - 1) {
+      onComplete();
+    } else {
+      setIsAnimating(true);
+      setTimeout(() => {
+        setCurrentStep(prev => prev + 1);
+        setIsAnimating(false);
+      }, 200);
+    }
+  };
+
+  const handleBack = () => {
+    if (currentStep > 0) {
+      setIsAnimating(true);
+      setTimeout(() => {
+        setCurrentStep(prev => prev - 1);
+        setIsAnimating(false);
+      }, 200);
+    }
+  };
 
   return (
-    <div className="fixed inset-0 z-[200] flex items-center justify-center p-4 bg-slate-950/80 backdrop-blur-sm animate-in fade-in duration-300">
-      <div className="w-full max-w-md bg-slate-900 border border-purple-500/30 rounded-2xl shadow-2xl overflow-hidden ring-1 ring-white/10 animate-in zoom-in-95 duration-300">
-        <div className="p-6">
-          <div className="flex justify-between items-center mb-6">
-            <div className="flex gap-1">
-              {steps.map((_, i) => (
-                <div key={i} className={`h-1 w-6 rounded-full transition-all ${i <= currentStep ? 'bg-purple-500 shadow-[0_0_8px_rgba(168,85,247,0.5)]' : 'bg-slate-800'}`}></div>
-              ))}
+    <div className="fixed inset-0 z-[200] flex items-center justify-center p-4 bg-slate-950/90 backdrop-blur-md animate-in fade-in duration-300">
+      <div className={`w-full max-w-lg bg-gradient-to-b from-slate-900 to-slate-950 border border-purple-500/20 rounded-3xl shadow-2xl overflow-hidden ring-1 ring-white/5 transition-all duration-200 ${isAnimating ? 'opacity-0 scale-95' : 'opacity-100 scale-100'}`}>
+        {/* Progress bar */}
+        <div className="h-1 bg-slate-800 flex">
+          {steps.map((_, i) => (
+            <div
+              key={i}
+              className={`flex-1 transition-all duration-500 ${i <= currentStep ? 'bg-gradient-to-r from-purple-500 to-indigo-500' : ''}`}
+            />
+          ))}
+        </div>
+
+        <div className="p-8">
+          {/* Header */}
+          <div className="flex justify-between items-start mb-6">
+            <div className="p-3 bg-slate-800/50 rounded-2xl border border-slate-700/50">
+              {step.icon}
             </div>
-            <button onClick={onComplete} className="text-slate-500 hover:text-white transition-colors">
-              <X size={20} />
-            </button>
+            <div className="flex items-center gap-3">
+              <span className="text-xs font-bold text-slate-500 uppercase tracking-wider">
+                Step {currentStep + 1} of {totalSteps}
+              </span>
+              <button
+                onClick={onComplete}
+                className="text-slate-600 hover:text-slate-400 transition-colors p-1"
+                title="Skip onboarding"
+              >
+                <X size={18} />
+              </button>
+            </div>
           </div>
 
-          <h3 className="text-xl font-black text-white mb-2 uppercase tracking-tight">{step.title}</h3>
-          <p className="text-slate-400 text-sm leading-relaxed mb-8">{step.content}</p>
+          {/* Content */}
+          <div className="mb-8">
+            <h2 className="text-2xl font-black text-white mb-1">{step.title}</h2>
+            <p className="text-sm font-medium text-purple-400 mb-4">{step.subtitle}</p>
+            <p className="text-slate-400 leading-relaxed">{step.content}</p>
+          </div>
 
-          <div className="flex justify-between items-center bg-slate-950/50 -mx-6 -mb-6 p-6 mt-4">
+          {/* Tips for specific steps */}
+          {step.id === 'subreddits' && (
+            <div className="bg-indigo-500/10 border border-indigo-500/20 rounded-xl p-4 mb-6">
+              <p className="text-xs font-bold text-indigo-400 uppercase mb-2">💡 Pro Tips</p>
+              <ul className="text-xs text-slate-400 space-y-1">
+                <li>• Start with 3-5 active subreddits</li>
+                <li>• Look for subreddits where people ask for recommendations</li>
+                <li>• Niche subreddits often have higher quality leads</li>
+              </ul>
+            </div>
+          )}
+
+          {step.id === 'sync' && (
+            <div className="bg-emerald-500/10 border border-emerald-500/20 rounded-xl p-4 mb-6">
+              <p className="text-xs font-bold text-emerald-400 uppercase mb-2">⏱️ What happens next</p>
+              <ul className="text-xs text-slate-400 space-y-1">
+                <li>• We'll scan the last 3 days of posts</li>
+                <li>• AI analyzes each thread for buying signals</li>
+                <li>• You'll see leads ranked by relevance</li>
+              </ul>
+            </div>
+          )}
+
+          {/* Actions */}
+          <div className="flex justify-between items-center pt-4 border-t border-slate-800">
             <button
-              onClick={currentStep === 0 ? onComplete : () => setCurrentStep(prev => prev - 1)}
-              className="text-xs font-bold text-slate-500 hover:text-white uppercase tracking-widest transition-colors"
+              onClick={currentStep === 0 ? onComplete : handleBack}
+              className="text-xs font-bold text-slate-500 hover:text-white uppercase tracking-widest transition-colors px-4 py-2"
             >
-              {currentStep === 0 ? "Skip Intro" : "Previous"}
+              {currentStep === 0 ? "Skip Tutorial" : "← Back"}
             </button>
             <button
-              onClick={currentStep === steps.length - 1 ? onComplete : () => setCurrentStep(prev => prev + 1)}
-              className="px-6 py-2 bg-purple-600 hover:bg-purple-500 text-white text-xs font-black uppercase tracking-widest rounded-lg transition-all shadow-lg shadow-purple-900/20 active:scale-95"
+              onClick={handleNext}
+              className="px-8 py-3 bg-gradient-to-r from-purple-600 to-indigo-600 hover:from-purple-500 hover:to-indigo-500 text-white text-sm font-black uppercase tracking-wide rounded-xl transition-all shadow-lg shadow-purple-900/30 active:scale-95 flex items-center gap-2"
             >
-              {currentStep === steps.length - 1 ? "Get Started" : "Next Step"}
+              {step.actionLabel}
+              {currentStep < totalSteps - 1 && <ChevronRight size={16} />}
             </button>
           </div>
         </div>
       </div>
     </div>
+  );
+};
+
+// Legacy wrapper for backwards compatibility
+const OnboardingWizard = ({ steps, onComplete }) => {
+  return (
+    <InteractiveOnboarding
+      onComplete={onComplete}
+      onOpenProductModal={() => { }}
+      hasProducts={true}
+      onStartSync={() => { }}
+    />
   );
 };
 
@@ -168,6 +315,15 @@ const ProductModal = ({ isOpen, onClose, onSave, product }) => {
     website_url: "",
     default_response_style: "empathetic"
   });
+  const [extracting, setExtracting] = useState(false);
+  const [extractError, setExtractError] = useState(null);
+  const [suggestedSubs, setSuggestedSubs] = useState([]);
+  const { getToken } = useAuth();
+
+  const getAuthHeaders = async () => {
+    const token = await getToken();
+    return token ? { Authorization: `Bearer ${token}` } : {};
+  };
 
   useEffect(() => {
     if (product) {
@@ -180,7 +336,53 @@ const ProductModal = ({ isOpen, onClose, onSave, product }) => {
     } else {
       setFormData({ name: "", description: "", pain_signals: [], intent_signals: [], target_subreddits: [], website_url: "", default_response_style: "empathetic" });
     }
+    setExtractError(null);
+    setSuggestedSubs([]);
   }, [product, isOpen]);
+
+  const handleExtractUrl = async () => {
+    if (!formData.website_url) return;
+
+    setExtracting(true);
+    setExtractError(null);
+
+    try {
+      const headers = await getAuthHeaders();
+      const res = await axios.post(`${API_BASE}/api/extract/url`, {
+        url: formData.website_url
+      }, { headers });
+
+      const data = res.data;
+
+      // Auto-fill form with extracted data
+      setFormData(prev => ({
+        ...prev,
+        name: data.name || prev.name,
+        description: data.description || prev.description,
+        pain_signals: data.pain_signals?.length ? data.pain_signals : prev.pain_signals,
+        intent_signals: data.intent_signals?.length ? data.intent_signals : prev.intent_signals,
+      }));
+
+      // Fetch subreddit suggestions based on category
+      if (data.category) {
+        try {
+          const subRes = await axios.post(`${API_BASE}/api/subreddits/suggest`, {
+            category: data.category,
+            pain_signals: data.pain_signals,
+            intent_signals: data.intent_signals
+          }, { headers });
+          setSuggestedSubs(subRes.data.suggestions || []);
+        } catch (e) {
+          // Silently fail subreddit suggestions
+        }
+      }
+
+    } catch (err) {
+      setExtractError(err.response?.data?.detail || "Failed to extract. Please fill in manually.");
+    } finally {
+      setExtracting(false);
+    }
+  };
 
   if (!isOpen) return null;
 
@@ -263,13 +465,44 @@ const ProductModal = ({ isOpen, onClose, onSave, product }) => {
           </div>
 
           <div className="space-y-2">
-            <label className="text-xs font-bold text-slate-500 uppercase">Website URL (For direct recommendations)</label>
-            <input
-              className="w-full bg-slate-800 border border-slate-700 rounded-lg p-3 text-white outline-none focus:ring-2 focus:ring-indigo-500"
-              value={formData.website_url || ""}
-              onChange={e => setFormData({ ...formData, website_url: e.target.value })}
-              placeholder="https://profitdoctor.app"
-            />
+            <label className="text-xs font-bold text-slate-500 uppercase flex items-center gap-2">
+              Website URL
+              <span className="text-purple-400 font-normal">(Auto-fill with AI)</span>
+            </label>
+            <div className="flex gap-2">
+              <input
+                className="flex-1 bg-slate-800 border border-slate-700 rounded-lg p-3 text-white outline-none focus:ring-2 focus:ring-indigo-500"
+                value={formData.website_url || ""}
+                onChange={e => setFormData({ ...formData, website_url: e.target.value })}
+                placeholder="https://yourproduct.com"
+              />
+              <button
+                onClick={handleExtractUrl}
+                disabled={extracting || !formData.website_url}
+                className={`px-4 py-2 rounded-lg font-bold text-sm flex items-center gap-2 transition-all ${extracting || !formData.website_url
+                  ? 'bg-slate-700 text-slate-500 cursor-not-allowed'
+                  : 'bg-gradient-to-r from-purple-600 to-indigo-600 hover:from-purple-500 hover:to-indigo-500 text-white shadow-lg shadow-purple-900/20'
+                  }`}
+              >
+                {extracting ? (
+                  <>
+                    <Loader2 size={16} className="animate-spin" />
+                    Extracting...
+                  </>
+                ) : (
+                  <>
+                    <Sparkles size={16} />
+                    Extract
+                  </>
+                )}
+              </button>
+            </div>
+            {extractError && (
+              <p className="text-xs text-red-400 flex items-center gap-1 mt-1">
+                <AlertCircle size={12} />
+                {extractError}
+              </p>
+            )}
           </div>
 
           <div className="space-y-2">
@@ -338,6 +571,53 @@ const ProductModal = ({ isOpen, onClose, onSave, product }) => {
               </div>
             </div>
           ))}
+
+          {/* Suggested Subreddits Section */}
+          {suggestedSubs.length > 0 && (
+            <div className="space-y-3 bg-indigo-500/5 border border-indigo-500/20 rounded-xl p-4">
+              <div className="flex justify-between items-center">
+                <label className="text-xs font-bold text-indigo-400 uppercase flex items-center gap-2">
+                  <Sparkles size={14} />
+                  Suggested Subreddits
+                </label>
+                <button
+                  onClick={() => {
+                    const newSubs = suggestedSubs.filter(s => !formData.target_subreddits.includes(s));
+                    setFormData(prev => ({
+                      ...prev,
+                      target_subreddits: [...prev.target_subreddits, ...newSubs]
+                    }));
+                    setSuggestedSubs([]);
+                  }}
+                  className="text-xs font-bold text-indigo-400 hover:text-indigo-300 transition-colors"
+                >
+                  + Add All
+                </button>
+              </div>
+              <div className="flex flex-wrap gap-2">
+                {suggestedSubs.map((sub, i) => (
+                  <button
+                    key={i}
+                    onClick={() => {
+                      if (!formData.target_subreddits.includes(sub)) {
+                        setFormData(prev => ({
+                          ...prev,
+                          target_subreddits: [...prev.target_subreddits, sub]
+                        }));
+                      }
+                      setSuggestedSubs(prev => prev.filter(s => s !== sub));
+                    }}
+                    className={`px-3 py-1 rounded-full text-xs font-medium transition-all ${formData.target_subreddits.includes(sub)
+                      ? 'bg-emerald-500/20 text-emerald-400 border border-emerald-500/30'
+                      : 'bg-slate-800 text-slate-300 border border-slate-700 hover:border-indigo-500/50 hover:text-indigo-300'
+                      }`}
+                  >
+                    r/{sub} {formData.target_subreddits.includes(sub) ? '✓' : '+'}
+                  </button>
+                ))}
+              </div>
+            </div>
+          )}
         </div>
 
         <div className="p-6 border-t border-slate-800 flex justify-end gap-4 bg-slate-900/50">
@@ -429,6 +709,94 @@ const ProductManagement = ({ products, onEdit, onDelete, onCreate }) => {
             </div>
           );
         })}
+      </div>
+    </div>
+  );
+};
+
+// Empty State Component - Shown when no leads have been found yet
+const EmptyDashboard = ({ hasProducts, onCreateProduct, onStartSync }) => {
+  return (
+    <div className="flex flex-col items-center justify-center min-h-[60vh] text-center px-6 animate-in fade-in duration-500">
+      {/* Decorative background */}
+      <div className="absolute inset-0 overflow-hidden pointer-events-none">
+        <div className="absolute top-1/4 left-1/4 w-96 h-96 bg-purple-600/5 rounded-full blur-3xl"></div>
+        <div className="absolute bottom-1/4 right-1/4 w-96 h-96 bg-indigo-600/5 rounded-full blur-3xl"></div>
+      </div>
+
+      <div className="relative z-10">
+        {/* Icon */}
+        <div className="mb-6 p-6 bg-gradient-to-br from-purple-500/10 to-indigo-500/10 rounded-3xl border border-purple-500/20 inline-block">
+          <Radar size={48} className="text-purple-400" />
+        </div>
+
+        {/* Title */}
+        <h2 className="text-3xl font-black text-white mb-3">
+          {hasProducts ? "Ready to Find Your First Leads!" : "Welcome to SonarPro"}
+        </h2>
+
+        {/* Subtitle */}
+        <p className="text-slate-400 max-w-md mx-auto mb-8 leading-relaxed">
+          {hasProducts
+            ? "Your product is configured. Select some subreddits and run your first intelligence sync to discover leads."
+            : "Set up your first product to start discovering sales opportunities on Reddit."
+          }
+        </p>
+
+        {/* Actions */}
+        <div className="flex flex-col sm:flex-row gap-4 justify-center">
+          {!hasProducts ? (
+            <button
+              onClick={onCreateProduct}
+              className="px-8 py-4 bg-gradient-to-r from-purple-600 to-indigo-600 hover:from-purple-500 hover:to-indigo-500 text-white font-bold rounded-xl shadow-lg shadow-purple-900/30 transition-all active:scale-95 flex items-center justify-center gap-2"
+            >
+              <PlusCircle size={20} />
+              Add Your First Product
+            </button>
+          ) : (
+            <>
+              <button
+                onClick={onStartSync}
+                className="px-8 py-4 bg-gradient-to-r from-purple-600 to-indigo-600 hover:from-purple-500 hover:to-indigo-500 text-white font-bold rounded-xl shadow-lg shadow-purple-900/30 transition-all active:scale-95 flex items-center justify-center gap-2"
+              >
+                <Activity size={20} />
+                Run Intelligence Sync
+              </button>
+              <button
+                onClick={onCreateProduct}
+                className="px-6 py-4 bg-slate-800 hover:bg-slate-700 text-white font-bold rounded-xl border border-slate-700 transition-all flex items-center justify-center gap-2"
+              >
+                <Plus size={20} />
+                Add Another Product
+              </button>
+            </>
+          )}
+        </div>
+
+        {/* Quick tips */}
+        <div className="mt-12 grid grid-cols-1 md:grid-cols-3 gap-4 max-w-3xl mx-auto">
+          <div className="bg-slate-900/60 border border-slate-800 rounded-xl p-4 text-left">
+            <div className="flex items-center gap-2 mb-2">
+              <CheckCircle size={16} className="text-emerald-400" />
+              <span className="text-xs font-bold text-slate-400 uppercase">Step 1</span>
+            </div>
+            <p className="text-sm text-slate-300">Configure your product with pain signals and keywords</p>
+          </div>
+          <div className="bg-slate-900/60 border border-slate-800 rounded-xl p-4 text-left">
+            <div className="flex items-center gap-2 mb-2">
+              <Globe size={16} className="text-cyan-400" />
+              <span className="text-xs font-bold text-slate-400 uppercase">Step 2</span>
+            </div>
+            <p className="text-sm text-slate-300">Select relevant subreddits where your audience hangs out</p>
+          </div>
+          <div className="bg-slate-900/60 border border-slate-800 rounded-xl p-4 text-left">
+            <div className="flex items-center gap-2 mb-2">
+              <Sparkles size={16} className="text-purple-400" />
+              <span className="text-xs font-bold text-slate-400 uppercase">Step 3</span>
+            </div>
+            <p className="text-sm text-slate-300">AI analyzes posts and surfaces the best leads for you</p>
+          </div>
+        </div>
       </div>
     </div>
   );
@@ -727,6 +1095,7 @@ function MainApp() {
   const [products, setProducts] = useState([]);
   const [editingProduct, setEditingProduct] = useState(null);
   const [isModalOpen, setIsModalOpen] = useState(false);
+  const [isChangelogOpen, setIsChangelogOpen] = useState(false);
   const [showOnboarding, setShowOnboarding] = useState(false);
 
   const { isLoaded, isSignedIn, getToken } = useAuth();
@@ -874,7 +1243,7 @@ function MainApp() {
       };
 
       poll();
-      interval = setInterval(poll, 5000);
+      interval = setInterval(poll, 10000); // Reduced from 5s to 10s for less server load
     }
     return () => clearInterval(interval);
   }, [syncing]);
@@ -1173,14 +1542,94 @@ function MainApp() {
               </div> {/* Closes the "space-y-6" div */}
             </div> {/* Closes the "flex-1 overflow-y-auto" div */}
 
-            <div className="p-6 border-t border-slate-800 bg-slate-900/50 flex items-center justify-between">
-              <div className="flex items-center gap-3 text-slate-500 hover:text-slate-300 transition-colors cursor-pointer">
-                <Settings size={18} />
-                <span className="text-sm">Settings</span>
+            <div className="p-6 border-t border-slate-800 bg-slate-900/50">
+              <div className="flex items-center justify-between mb-3">
+                <div className="flex items-center gap-3 text-slate-500 hover:text-slate-300 transition-colors cursor-pointer">
+                  <Settings size={18} />
+                  <span className="text-sm">Settings</span>
+                </div>
+                <UserButton afterSignOutUrl="/" />
               </div>
-              <UserButton afterSignOutUrl="/" />
+              <div className="flex flex-col items-center gap-1">
+                <span className="text-[10px] text-slate-600 font-mono">SonarPro v0.0.3</span>
+                <button
+                  onClick={() => setIsChangelogOpen(true)}
+                  className="text-[9px] text-indigo-400/60 hover:text-indigo-400 transition-colors uppercase tracking-widest font-bold"
+                >
+                  [ What's New ]
+                </button>
+              </div>
             </div>
           </aside>
+
+          {/* Changelog Modal */}
+          {isChangelogOpen && (
+            <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm">
+              <div className="bg-slate-900 border border-slate-700 w-full max-w-xl rounded-2xl overflow-hidden shadow-2xl animate-in fade-in zoom-in duration-200">
+                <div className="p-6 border-b border-slate-800 flex justify-between items-center bg-slate-800/50">
+                  <div className="flex items-center gap-3">
+                    <div className="p-2 bg-indigo-500/20 rounded-lg">
+                      <Zap size={20} className="text-indigo-400" />
+                    </div>
+                    <h2 className="text-xl font-bold text-white">Changelog</h2>
+                  </div>
+                  <button onClick={() => setIsChangelogOpen(false)} className="text-slate-400 hover:text-white transition-colors">
+                    <X size={24} />
+                  </button>
+                </div>
+                <div className="p-8 max-h-[60vh] overflow-y-auto custom-scrollbar space-y-8">
+                  <section>
+                    <div className="flex items-center justify-between mb-4">
+                      <h3 className="text-lg font-bold text-white">v0.0.3</h3>
+                      <span className="text-xs text-slate-500 font-mono italic">2026-01-16</span>
+                    </div>
+                    <div className="space-y-6">
+                      <div className="group">
+                        <h4 className="text-xs font-bold text-indigo-400 uppercase tracking-widest mb-2 flex items-center gap-2">
+                          <AlertTriangle size={14} /> AI Ad & Spam Detection
+                        </h4>
+                        <ul className="text-sm text-slate-300 space-y-2 list-disc pl-4 marker:text-indigo-500">
+                          <li><strong className="text-slate-200">Intent Analysis</strong>: UI now identifies "Hard Ads" vs "Insightful Founders".</li>
+                          <li><strong className="text-slate-200">Warning Badges</strong>: Visual cues for possible advertising content.</li>
+                          <li><strong className="text-slate-200">Spam Indicators</strong>: Detailed explanations in AI Insight view.</li>
+                        </ul>
+                      </div>
+                      <div className="group">
+                        <h4 className="text-xs font-bold text-emerald-400 uppercase tracking-widest mb-2 flex items-center gap-2">
+                          <CheckCircle2 size={14} /> Pipeline Robustness
+                        </h4>
+                        <ul className="text-sm text-slate-300 space-y-2 list-disc pl-4 marker:text-emerald-500">
+                          <li>Added per-post failsafes to prevent batch crashes.</li>
+                          <li>Fixed NoneType errors on empty post content.</li>
+                        </ul>
+                      </div>
+                    </div>
+                  </section>
+
+                  <section className="pt-6 border-t border-slate-800">
+                    <div className="flex items-center justify-between mb-4">
+                      <h3 className="text-lg font-bold text-slate-400">v0.0.2</h3>
+                      <span className="text-xs text-slate-600 font-mono">2026-01-15</span>
+                    </div>
+                    <ul className="text-sm text-slate-500 space-y-2 list-disc pl-4 border-l-2 border-slate-800">
+                      <li>Interactive Onboarding for new users.</li>
+                      <li>Smart Product Setup with URL auto-extraction.</li>
+                      <li>Celery + Redis async background processing.</li>
+                      <li>Memory leak and performance optimizations.</li>
+                    </ul>
+                  </section>
+                </div>
+                <div className="p-4 bg-slate-950/50 border-t border-slate-800 text-center">
+                  <button
+                    onClick={() => setIsChangelogOpen(false)}
+                    className="px-6 py-2 bg-slate-800 hover:bg-slate-700 text-white rounded-lg transition-all text-sm font-bold"
+                  >
+                    Got it!
+                  </button>
+                </div>
+              </div>
+            </div>
+          )}
 
           {/* Main Content */}
           <main className="flex-1 p-10 overflow-y-auto">
@@ -1205,384 +1654,440 @@ function MainApp() {
                   </div>
                 </header>
 
-                {/* Stats Grid */}
-                <div className="grid grid-cols-5 gap-4 mb-12">
-                  <Tooltip text="Measures the depth and frequency of problem discussion. Click to filter hot topics.">
-                    <div
-                      onClick={() => {
-                        const newVal = activeFilter === "intensity" ? "all" : "intensity";
-                        setActiveFilter(newVal);
-                        setSortBy("highest");
-                      }}
-                      className={`p-5 rounded-2xl border transition-all cursor-pointer flex items-center justify-between shadow-sm ${activeFilter === "intensity" ? "bg-indigo-600 border-indigo-400 shadow-indigo-500/20" : "bg-slate-900 border-slate-800 hover:border-indigo-500/30"
-                        }`}
-                    >
-                      <div>
-                        <p className={`text-[10px] uppercase tracking-widest mb-1 flex items-center gap-1 ${activeFilter === "intensity" ? "text-indigo-100" : "text-slate-500"}`}>
-                          High Intensity <HelpCircle size={10} />
-                        </p>
-                        <h3 className={`text-2xl font-bold ${activeFilter === "intensity" ? "text-white" : "text-orange-400"}`}>
-                          {threads.filter(t => t.community_score > 3.0).length}
-                        </h3>
-                      </div>
-                      <BarChart3 size={24} className={activeFilter === "intensity" ? "text-white/40" : "text-slate-700"} />
-                    </div>
-                  </Tooltip>
-
-                  <Tooltip text="Number of posts that directly match your product signals. Click to filter.">
-                    <div
-                      onClick={() => {
-                        const newVal = activeFilter === "fit" ? "all" : "fit";
-                        setActiveFilter(newVal);
-                        setSortBy("highest");
-                      }}
-                      className={`p-5 rounded-2xl border transition-all cursor-pointer flex items-center justify-between shadow-sm ${activeFilter === "fit" ? "bg-indigo-600 border-indigo-400 shadow-indigo-500/20" : "bg-slate-900 border-slate-800 hover:border-indigo-500/30"
-                        }`}
-                    >
-                      <div>
-                        <p className={`text-[10px] uppercase tracking-widest mb-1 flex items-center gap-1 ${activeFilter === "fit" ? "text-indigo-100" : "text-slate-500"}`}>
-                          High Fit Leads <HelpCircle size={10} />
-                        </p>
-                        <h3 className={`text-2xl font-bold ${activeFilter === "fit" ? "text-white" : "text-emerald-400"}`}>
-                          {threads.filter(t => t.semantic_similarity > 0.5).length}
-                        </h3>
-                      </div>
-                      <CheckCircle2 size={24} className={activeFilter === "fit" ? "text-white/40" : "text-slate-700"} />
-                    </div>
-                  </Tooltip>
-
-                  <Tooltip text="Highly relevant leads based on combined score. Click to filter.">
-                    <div
-                      onClick={() => {
-                        const newVal = activeFilter === "score" ? "all" : "score";
-                        setActiveFilter(newVal);
-                        setSortBy("highest");
-                      }}
-                      className={`p-5 rounded-2xl border transition-all cursor-pointer flex items-center justify-between shadow-sm ${activeFilter === "score" ? "bg-indigo-600 border-indigo-400 shadow-indigo-500/20" : "bg-slate-900 border-slate-800 hover:border-indigo-500/30"
-                        }`}
-                    >
-                      <div>
-                        <p className={`text-[10px] uppercase tracking-widest mb-1 flex items-center gap-1 ${activeFilter === "score" ? "text-indigo-100" : "text-slate-500"}`}>
-                          High Score <HelpCircle size={10} />
-                        </p>
-                        <h3 className={`text-2xl font-bold ${activeFilter === "score" ? "text-white" : "text-indigo-400"}`}>
-                          {threads.filter(t => t.relevance_score > 15.0).length}
-                        </h3>
-                      </div>
-                      <Zap size={24} className={activeFilter === "score" ? "text-white/40" : "text-slate-700"} />
-                    </div>
-                  </Tooltip>
-
-                  <Tooltip text="Maximum problem intensity detected in the current set.">
-                    <div className="bg-slate-900 p-5 rounded-2xl border border-slate-800 flex items-center justify-between shadow-sm">
-                      <div>
-                        <p className="text-[10px] text-slate-500 uppercase tracking-widest mb-1">Max Intensity</p>
-                        <h3 className="text-2xl font-bold text-white">
-                          {threads.length > 0 ? Math.max(...threads.map(t => t.community_score)).toFixed(1) : "0.0"}
-                        </h3>
-                      </div>
-                      <TrendingUp size={24} className="text-slate-700" />
-                    </div>
-                  </Tooltip>
-
-                  <Tooltip text="Average product alignment quality across pipeline.">
-                    <div className="bg-slate-900 p-5 rounded-2xl border border-slate-800 flex items-center justify-between shadow-sm">
-                      <div>
-                        <p className="text-[10px] text-slate-500 uppercase tracking-widest mb-1">Avg Fit</p>
-                        <h3 className="text-2xl font-bold text-white">
-                          {threads.length > 0 ? Math.round((threads.reduce((acc, t) => acc + t.semantic_similarity, 0) / threads.length) * 100) : 0}%
-                        </h3>
-                      </div>
-                      <Radar size={24} className="text-slate-700" />
-                    </div>
-                  </Tooltip>
-                </div>
-
-                {/* Threads List */}
-                <div className="space-y-4">
-                  <div className="flex items-center justify-between mb-6">
-                    <h3 className="text-xl font-bold text-white flex items-center gap-3">
-                      <AlertTriangle className="text-yellow-500" />
-                      Intelligence Results
-                    </h3>
-
-                    <div className="flex bg-slate-900 p-1 rounded-lg border border-slate-800">
-                      <button
-                        onClick={() => setSortBy("highest")}
-                        className={`px-4 py-1.5 rounded-md text-xs font-bold transition-all ${sortBy === "highest" ? "bg-indigo-600 text-white" : "text-slate-500 hover:text-slate-300"}`}
-                      >
-                        Sort by Highest
-                      </button>
-                      <button
-                        onClick={() => setSortBy("newest")}
-                        className={`px-4 py-1.5 rounded-md text-xs font-bold transition-all ${sortBy === "newest" ? "bg-indigo-600 text-white" : "text-slate-500 hover:text-slate-300"}`}
-                      >
-                        Sort by Newest
-                      </button>
-                    </div>
-                  </div>
-
-                  {loading ? (
-                    <div className="h-64 flex items-center justify-center text-slate-500">Loading intelligence...</div>
-                  ) : filteredThreads.length === 0 ? (
-                    <div className="h-64 flex flex-col items-center justify-center text-slate-500 bg-slate-900/50 rounded-2xl border border-dashed border-slate-800">
-                      <Search className="mb-4 opacity-20" size={48} />
-                      <p className="text-lg font-medium">No results match this filter</p>
-                      <button
-                        onClick={() => setActiveFilter("all")}
-                        className="mt-4 text-indigo-400 hover:text-indigo-300 font-bold"
-                      >
-                        Clear all filters
-                      </button>
-                    </div>
-                  ) : (
-                    filteredThreads.map((thread) => {
-                      const isExpanded = expandedThread === thread.id;
-                      const signals = thread.signals_json ? JSON.parse(thread.signals_json) : null;
-
-                      return (
+                {/* Show Empty State when no threads */}
+                {!loading && threads.length === 0 ? (
+                  <EmptyDashboard
+                    hasProducts={products.length > 0}
+                    onCreateProduct={openCreate}
+                    onStartSync={() => {
+                      // Scroll to sidebar sync section
+                      document.querySelector('[data-sync-button]')?.click();
+                    }}
+                  />
+                ) : (
+                  <>
+                    {/* Stats Grid */}
+                    <div className="grid grid-cols-5 gap-4 mb-12">
+                      <Tooltip text="Measures the depth and frequency of problem discussion. Click to filter hot topics.">
                         <div
-                          key={thread.id}
-                          className={`bg-slate-900 border transition-all group flex flex-col gap-0 rounded-2xl overflow-hidden ${isExpanded ? 'border-indigo-500 shadow-2xl shadow-indigo-500/10' : 'bg-slate-900/50 border-slate-800/50 hover:border-slate-700'
+                          onClick={() => {
+                            const newVal = activeFilter === "intensity" ? "all" : "intensity";
+                            setActiveFilter(newVal);
+                            setSortBy("highest");
+                          }}
+                          className={`p-5 rounded-2xl border transition-all cursor-pointer flex items-center justify-between shadow-sm ${activeFilter === "intensity" ? "bg-indigo-600 border-indigo-400 shadow-indigo-500/20" : "bg-slate-900 border-slate-800 hover:border-indigo-500/30"
                             }`}
                         >
-                          <div
-                            className="p-6 flex items-start gap-6 cursor-pointer"
-                            onClick={() => setExpandedThread(isExpanded ? null : thread.id)}
-                          >
-                            <div className="flex flex-col items-center gap-1 min-w-[60px]">
-                              <span className="text-xs text-slate-500 uppercase font-semibold">Score</span>
-                              <div className="text-xl font-black text-indigo-400">{thread.relevance_score.toFixed(1)}</div>
-                            </div>
-
-                            <div className="flex-1 space-y-2">
-                              <div className="flex items-center gap-3">
-                                <span className="px-2 py-0.5 rounded bg-slate-800 text-[10px] font-bold text-indigo-300 uppercase">r/{thread.source}</span>
-                                <span className="text-[10px] text-slate-500">●</span>
-                                <span className="text-[10px] text-slate-500">{new Date(thread.created_at).toLocaleDateString()}</span>
-                              </div>
-                              <h4 className="text-lg font-bold text-slate-100 group-hover:text-white leading-tight">{thread.title}</h4>
-                              {!isExpanded && <p className="text-sm text-slate-400 line-clamp-2 leading-relaxed">{thread.body}</p>}
-
-                              <div className="flex items-center gap-6 pt-2">
-                                <div className="flex items-center gap-2">
-                                  <div className="w-16 h-1 bg-slate-800 rounded-full overflow-hidden">
-                                    <div className="h-full bg-indigo-500" style={{ width: `${thread.semantic_similarity * 100}%` }}></div>
-                                  </div>
-                                  <span className="text-[10px] font-semibold text-slate-500 uppercase">Fit: {Math.round(thread.semantic_similarity * 100)}%</span>
-                                </div>
-                                <div className="flex items-center gap-2 text-slate-500">
-                                  <BarChart3 size={14} />
-                                  <span className="text-[10px] font-semibold uppercase">Intensity: {thread.community_score.toFixed(1)}</span>
-                                </div>
-                                <div className={`flex items-center gap-1 text-[10px] font-bold uppercase ml-auto px-3 py-1.5 rounded-lg border transition-all ${isExpanded
-                                  ? 'bg-slate-800 border-slate-700 text-slate-400'
-                                  : 'bg-indigo-500/10 border-indigo-500/20 text-indigo-400 hover:bg-indigo-500/20 hover:border-indigo-500/40'
-                                  }`}>
-                                  {isExpanded ? "Collapse" : "View Analysis"}
-                                  <ChevronDown size={14} className={`transition-transform duration-300 ${isExpanded ? 'rotate-180' : ''}`} />
-                                </div>
-
-                                {thread.is_stale === 1 && (
-                                  <div
-                                    className="flex items-center gap-1 px-2 py-1 bg-amber-500/10 border border-amber-500/20 rounded-lg animate-pulse"
-                                    title={`Metrics changed significantly since last review (Previous Score: ${thread.triage_relevance_snapshot?.toFixed(1)})`}
-                                  >
-                                    <AlertTriangle size={12} className="text-amber-500" />
-                                    <span className="text-[9px] font-black text-amber-500 uppercase tracking-tighter">Review Needed</span>
-                                  </div>
-                                )}
-                                <div className="flex items-center gap-1.5 p-1 bg-slate-900/80 border border-slate-700/50 rounded-lg ml-2">
-                                  <button
-                                    onClick={(e) => { e.stopPropagation(); handleTriage(thread.id, 'agree'); }}
-                                    className={`p-1.5 rounded-md transition-all ${thread.triage_status === 'agree' ? 'bg-emerald-500 text-white shadow-lg shadow-emerald-500/20' : 'text-slate-500 hover:bg-slate-800 hover:text-emerald-400'}`}
-                                    title="Agree with this lead"
-                                  >
-                                    <ThumbsUp size={14} />
-                                  </button>
-                                  <button
-                                    onClick={(e) => { e.stopPropagation(); handleTriage(thread.id, 'disagree'); }}
-                                    className={`p-1.5 rounded-md transition-all ${thread.triage_status === 'disagree' ? 'bg-red-500 text-white shadow-lg shadow-red-500/20' : 'text-slate-500 hover:bg-slate-800 hover:text-red-400'}`}
-                                    title="Disagree with this lead"
-                                  >
-                                    <ThumbsDown size={14} />
-                                  </button>
-                                </div>
-                              </div>
-                            </div>
+                          <div>
+                            <p className={`text-[10px] uppercase tracking-widest mb-1 flex items-center gap-1 ${activeFilter === "intensity" ? "text-indigo-100" : "text-slate-500"}`}>
+                              High Intensity <HelpCircle size={10} />
+                            </p>
+                            <h3 className={`text-2xl font-bold ${activeFilter === "intensity" ? "text-white" : "text-orange-400"}`}>
+                              {threads.filter(t => t.community_score > 3.0).length}
+                            </h3>
                           </div>
+                          <BarChart3 size={24} className={activeFilter === "intensity" ? "text-white/40" : "text-slate-700"} />
+                        </div>
+                      </Tooltip>
 
-                          {isExpanded && (
-                            <div className="px-6 pb-6 pt-0 animate-in fade-in slide-in-from-top-2 duration-300">
-                              <div className="border-t border-slate-800 pt-6 space-y-6">
-                                {/* Tags Section */}
-                                {signals && (
-                                  <div className="flex flex-wrap gap-2">
-                                    {signals.intents?.map(intent => (
-                                      <span key={intent} className="px-2 py-1 rounded-full bg-indigo-500/10 border border-indigo-500/20 text-[10px] font-bold text-indigo-400 uppercase">
-                                        {intent}
-                                      </span>
-                                    ))}
-                                    {signals.product_matches && signals.product_matches[selectedProduct.toLowerCase()] && (
-                                      <>
-                                        {signals.product_matches[selectedProduct.toLowerCase()].intents?.map(p_intent => (
-                                          <span key={p_intent} className="px-2 py-1 rounded-full bg-indigo-500/10 border border-indigo-500/20 text-[10px] font-bold text-cyan-400 uppercase">
-                                            {p_intent}
-                                          </span>
-                                        ))}
-                                        {signals.product_matches[selectedProduct.toLowerCase()].pain_points?.map(p_point => (
-                                          <span key={p_point} className="px-2 py-1 rounded-full bg-orange-500/10 border border-orange-500/20 text-[10px] font-bold text-orange-400 uppercase">
-                                            {p_point}
-                                          </span>
-                                        ))}
-                                      </>
-                                    )}
+                      <Tooltip text="Number of posts that directly match your product signals. Click to filter.">
+                        <div
+                          onClick={() => {
+                            const newVal = activeFilter === "fit" ? "all" : "fit";
+                            setActiveFilter(newVal);
+                            setSortBy("highest");
+                          }}
+                          className={`p-5 rounded-2xl border transition-all cursor-pointer flex items-center justify-between shadow-sm ${activeFilter === "fit" ? "bg-indigo-600 border-indigo-400 shadow-indigo-500/20" : "bg-slate-900 border-slate-800 hover:border-indigo-500/30"
+                            }`}
+                        >
+                          <div>
+                            <p className={`text-[10px] uppercase tracking-widest mb-1 flex items-center gap-1 ${activeFilter === "fit" ? "text-indigo-100" : "text-slate-500"}`}>
+                              High Fit Leads <HelpCircle size={10} />
+                            </p>
+                            <h3 className={`text-2xl font-bold ${activeFilter === "fit" ? "text-white" : "text-emerald-400"}`}>
+                              {threads.filter(t => t.semantic_similarity > 0.5).length}
+                            </h3>
+                          </div>
+                          <CheckCircle2 size={24} className={activeFilter === "fit" ? "text-white/40" : "text-slate-700"} />
+                        </div>
+                      </Tooltip>
+
+                      <Tooltip text="Highly relevant leads based on combined score. Click to filter.">
+                        <div
+                          onClick={() => {
+                            const newVal = activeFilter === "score" ? "all" : "score";
+                            setActiveFilter(newVal);
+                            setSortBy("highest");
+                          }}
+                          className={`p-5 rounded-2xl border transition-all cursor-pointer flex items-center justify-between shadow-sm ${activeFilter === "score" ? "bg-indigo-600 border-indigo-400 shadow-indigo-500/20" : "bg-slate-900 border-slate-800 hover:border-indigo-500/30"
+                            }`}
+                        >
+                          <div>
+                            <p className={`text-[10px] uppercase tracking-widest mb-1 flex items-center gap-1 ${activeFilter === "score" ? "text-indigo-100" : "text-slate-500"}`}>
+                              High Score <HelpCircle size={10} />
+                            </p>
+                            <h3 className={`text-2xl font-bold ${activeFilter === "score" ? "text-white" : "text-indigo-400"}`}>
+                              {threads.filter(t => t.relevance_score > 15.0).length}
+                            </h3>
+                          </div>
+                          <Zap size={24} className={activeFilter === "score" ? "text-white/40" : "text-slate-700"} />
+                        </div>
+                      </Tooltip>
+
+                      <Tooltip text="Maximum problem intensity detected in the current set.">
+                        <div className="bg-slate-900 p-5 rounded-2xl border border-slate-800 flex items-center justify-between shadow-sm">
+                          <div>
+                            <p className="text-[10px] text-slate-500 uppercase tracking-widest mb-1">Max Intensity</p>
+                            <h3 className="text-2xl font-bold text-white">
+                              {threads.length > 0 ? Math.max(...threads.map(t => t.community_score)).toFixed(1) : "0.0"}
+                            </h3>
+                          </div>
+                          <TrendingUp size={24} className="text-slate-700" />
+                        </div>
+                      </Tooltip>
+
+                      <Tooltip text="Average product alignment quality across pipeline.">
+                        <div className="bg-slate-900 p-5 rounded-2xl border border-slate-800 flex items-center justify-between shadow-sm">
+                          <div>
+                            <p className="text-[10px] text-slate-500 uppercase tracking-widest mb-1">Avg Fit</p>
+                            <h3 className="text-2xl font-bold text-white">
+                              {threads.length > 0 ? Math.round((threads.reduce((acc, t) => acc + t.semantic_similarity, 0) / threads.length) * 100) : 0}%
+                            </h3>
+                          </div>
+                          <Radar size={24} className="text-slate-700" />
+                        </div>
+                      </Tooltip>
+                    </div>
+
+                    {/* Threads List */}
+                    <div className="space-y-4">
+                      <div className="flex items-center justify-between mb-6">
+                        <h3 className="text-xl font-bold text-white flex items-center gap-3">
+                          <AlertTriangle className="text-yellow-500" />
+                          Intelligence Results
+                        </h3>
+
+                        <div className="flex bg-slate-900 p-1 rounded-lg border border-slate-800">
+                          <button
+                            onClick={() => setSortBy("highest")}
+                            className={`px-4 py-1.5 rounded-md text-xs font-bold transition-all ${sortBy === "highest" ? "bg-indigo-600 text-white" : "text-slate-500 hover:text-slate-300"}`}
+                          >
+                            Sort by Highest
+                          </button>
+                          <button
+                            onClick={() => setSortBy("newest")}
+                            className={`px-4 py-1.5 rounded-md text-xs font-bold transition-all ${sortBy === "newest" ? "bg-indigo-600 text-white" : "text-slate-500 hover:text-slate-300"}`}
+                          >
+                            Sort by Newest
+                          </button>
+                        </div>
+                      </div>
+
+                      {loading ? (
+                        <div className="h-64 flex items-center justify-center text-slate-500">Loading intelligence...</div>
+                      ) : filteredThreads.length === 0 ? (
+                        <div className="h-64 flex flex-col items-center justify-center text-slate-500 bg-slate-900/50 rounded-2xl border border-dashed border-slate-800">
+                          <Search className="mb-4 opacity-20" size={48} />
+                          <p className="text-lg font-medium">No results match this filter</p>
+                          <button
+                            onClick={() => setActiveFilter("all")}
+                            className="mt-4 text-indigo-400 hover:text-indigo-300 font-bold"
+                          >
+                            Clear all filters
+                          </button>
+                        </div>
+                      ) : (
+                        filteredThreads.map((thread) => {
+                          const isExpanded = expandedThread === thread.id;
+                          const signals = thread.signals_json ? JSON.parse(thread.signals_json) : null;
+
+                          return (
+                            <div
+                              key={thread.id}
+                              className={`bg-slate-900 border transition-all group flex flex-col gap-0 rounded-2xl overflow-hidden ${isExpanded ? 'border-indigo-500 shadow-2xl shadow-indigo-500/10' : 'bg-slate-900/50 border-slate-800/50 hover:border-slate-700'
+                                }`}
+                            >
+                              <div
+                                className="p-6 flex items-start gap-6 cursor-pointer"
+                                onClick={() => setExpandedThread(isExpanded ? null : thread.id)}
+                              >
+                                <div className="flex flex-col items-center gap-1 min-w-[60px]">
+                                  <span className="text-xs text-slate-500 uppercase font-semibold">Score</span>
+                                  <div className="text-xl font-black text-indigo-400">{thread.relevance_score.toFixed(1)}</div>
+                                </div>
+
+                                <div className="flex-1 space-y-2">
+                                  <div className="flex items-center gap-3">
+                                    <span className="px-2 py-0.5 rounded bg-slate-800 text-[10px] font-bold text-indigo-300 uppercase">r/{thread.source}</span>
+                                    <span className="text-[10px] text-slate-500">●</span>
+                                    <span className="text-[10px] text-slate-500">{new Date(thread.created_at).toLocaleDateString()}</span>
                                   </div>
-                                )}
+                                  <h4 className="text-lg font-bold text-slate-100 group-hover:text-white leading-tight">{thread.title}</h4>
+                                  {!isExpanded && <p className="text-sm text-slate-400 line-clamp-2 leading-relaxed">{thread.body}</p>}
 
-                                {/* Analysis Section */}
-                                <div className="grid grid-cols-2 gap-8">
-                                  <div className="space-y-3">
-                                    <h5 className="text-xs font-bold text-slate-500 uppercase tracking-widest flex items-center gap-2">
-                                      <FileText size={14} /> Full Thread Content
-                                    </h5>
-                                    <div className="text-sm text-slate-300 bg-slate-800/50 p-4 rounded-xl border border-slate-800 leading-relaxed max-h-64 overflow-y-auto custom-scrollbar">
-                                      {thread.body}
-                                      <div className="mt-4 pt-4 border-t border-slate-800">
-                                        <a href={thread.url} target="_blank" rel="noreferrer" className="text-indigo-400 hover:text-indigo-300 font-bold flex items-center gap-1">
-                                          Open Original Post <ExternalLink size={14} />
-                                        </a>
+                                  <div className="flex items-center gap-6 pt-2">
+                                    <div className="flex items-center gap-2">
+                                      <div className="w-16 h-1 bg-slate-800 rounded-full overflow-hidden">
+                                        <div className="h-full bg-indigo-500" style={{ width: `${thread.semantic_similarity * 100}%` }}></div>
                                       </div>
+                                      <span className="text-[10px] font-semibold text-slate-500 uppercase">Fit: {Math.round(thread.semantic_similarity * 100)}%</span>
+                                    </div>
+                                    <div className="flex items-center gap-2 text-slate-500">
+                                      <BarChart3 size={14} />
+                                      <span className="text-[10px] font-semibold uppercase">Intensity: {thread.community_score.toFixed(1)}</span>
+                                    </div>
+                                    <div className={`flex items-center gap-1 text-[10px] font-bold uppercase ml-auto px-3 py-1.5 rounded-lg border transition-all ${isExpanded
+                                      ? 'bg-slate-800 border-slate-700 text-slate-400'
+                                      : 'bg-indigo-500/10 border-indigo-500/20 text-indigo-400 hover:bg-indigo-500/20 hover:border-indigo-500/40'
+                                      }`}>
+                                      {isExpanded ? "Collapse" : "View Analysis"}
+                                      <ChevronDown size={14} className={`transition-transform duration-300 ${isExpanded ? 'rotate-180' : ''}`} />
                                     </div>
 
-                                    <h5 className="text-xs font-bold text-slate-500 uppercase tracking-widest flex items-center gap-2 mt-8">
-                                      <Sparkles size={14} className="text-purple-500" /> Profile Intelligence
-                                    </h5>
-                                    {thread.generatedResponse ? (
-                                      <ResponseCard
-                                        response={thread.generatedResponse}
-                                        postUrl={thread.url}
-                                        postId={thread.id}
-                                        productId={selectedProduct}
-                                        loading={thread.isRegenerating}
-                                        error={thread.genError}
-                                        availableStyles={['empathetic', 'helpful_expert', 'casual', 'technical', 'brief', 'product_referral']}
-                                        onRegenerate={(style) => {
-                                          const handleGen = async () => {
-                                            setThreads(prev => prev.map(t =>
-                                              t.id === thread.id ? { ...t, isRegenerating: true, genError: null } : t
-                                            ));
-
-                                            try {
-                                              const headers = await getAuthHeaders();
-                                              const resp = await axios.post(`${API_BASE}/api/responses/generate/${thread.id}`, {
-                                                product_id: selectedProduct,
-                                                style: style
-                                              }, { headers });
-                                              setThreads(prev => prev.map(t =>
-                                                t.id === thread.id ? { ...t, generatedResponse: resp.data, isRegenerating: false, genError: null } : t
-                                              ));
-                                            } catch (err) {
-                                              setThreads(prev => prev.map(t =>
-                                                t.id === thread.id ? { ...t, isRegenerating: false, genError: "Failed to generate. Try again." } : t
-                                              ));
-                                            }
-                                          };
-                                          handleGen();
-                                        }}
-                                      />
-                                    ) : (
-                                      <GenerateResponseButton
-                                        postId={thread.id}
-                                        productId={selectedProduct}
-                                        defaultStyle={productDefaultStyle}
-                                        onGenerated={(res) => {
-                                          setThreads(prev => prev.map(t =>
-                                            t.id === thread.id ? { ...t, generatedResponse: res, isRegenerating: false, genError: null } : t
-                                          ));
-                                        }}
-                                      />
+                                    {thread.is_stale === 1 && (
+                                      <div
+                                        className="flex items-center gap-1 px-2 py-1 bg-amber-500/10 border border-amber-500/20 rounded-lg animate-pulse"
+                                        title={`Metrics changed significantly since last review (Previous Score: ${thread.triage_relevance_snapshot?.toFixed(1)})`}
+                                      >
+                                        <AlertTriangle size={12} className="text-amber-500" />
+                                        <span className="text-[9px] font-black text-amber-500 uppercase tracking-tighter">Review Needed</span>
+                                      </div>
                                     )}
-                                  </div>
-
-                                  <div className="space-y-3">
-                                    <h5 className="text-xs font-bold text-slate-500 uppercase tracking-widest flex items-center gap-2">
-                                      <Zap size={14} className="text-yellow-500" /> AI Insight for {selectedProduct.toUpperCase()}
-                                    </h5>
-                                    <div className="text-sm text-slate-200 bg-indigo-500/5 p-6 rounded-2xl border border-indigo-500/10 leading-relaxed shadow-inner mb-6 space-y-4">
-                                      {(() => {
-                                        if (!thread.ai_analysis) return <p className="italic text-slate-500">AI analysis not required for this relevance level.</p>;
-                                        try {
-                                          const ai = JSON.parse(thread.ai_analysis);
-                                          if (ai.error) return <p className="text-red-400">Analysis failed: {ai.details}</p>;
+                                    {/* Spam/AD Warning Badge */}
+                                    {(() => {
+                                      try {
+                                        const ai = thread.ai_analysis ? JSON.parse(thread.ai_analysis) : null;
+                                        if (ai && ai.is_spam_or_ad) {
                                           return (
-                                            <div className="space-y-4">
-                                              <div className="flex justify-between items-start gap-4">
-                                                <div className="flex-1">
-                                                  <div className="flex items-center gap-2 mb-3">
-                                                    <div className="p-1 rounded bg-indigo-500/10 border border-indigo-500/20">
-                                                      <User size={10} className="text-indigo-400" />
-                                                    </div>
-                                                    <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">u/{ai.pain_author || thread.author}</span>
-                                                    {ai.is_from_comment ? (
-                                                      <span className="text-[9px] px-1.5 py-0.5 rounded-full bg-slate-800 text-slate-500 border border-slate-700 font-medium">Commenter</span>
-                                                    ) : (
-                                                      <span className="text-[9px] px-1.5 py-0.5 rounded-full bg-indigo-500/10 text-indigo-400 border border-indigo-500/20 font-medium">Author</span>
-                                                    )}
-                                                  </div>
-                                                  <p className="font-bold text-indigo-300 text-lg mb-1 leading-snug">{ai.pain_point_summary}</p>
-                                                  <p className="text-xs text-slate-400 italic">"{ai.pain_quote}"</p>
-                                                </div>
-                                                <div className="flex flex-col items-end gap-2">
-                                                  <span className={`px-2 py-1 rounded-md text-[10px] font-black uppercase tracking-tighter ${ai.urgency === 'High' ? 'bg-red-500/20 text-red-400 border border-red-500/30' :
-                                                    ai.urgency === 'Medium' ? 'bg-orange-500/20 text-orange-400 border border-orange-500/30' :
-                                                      'bg-slate-700/50 text-slate-400'
-                                                    }`}>
-                                                    {ai.urgency} Urgency
-                                                  </span>
-                                                  <div className="flex items-center gap-1">
-                                                    <div className="h-1.5 w-16 bg-slate-800 rounded-full overflow-hidden">
-                                                      <div className="h-full bg-indigo-500" style={{ width: `${(ai.product_relevance || 0) * 10}%` }}></div>
-                                                    </div>
-                                                    <span className="text-[10px] font-bold text-indigo-400">{ai.product_relevance}/10</span>
-                                                  </div>
-                                                </div>
-                                              </div>
-
-                                              <div className="grid grid-cols-1 gap-4 pt-4 border-t border-indigo-500/10">
-                                                <div>
-                                                  <p className="text-[10px] font-bold text-slate-500 uppercase mb-1">Why it matters</p>
-                                                  <p className="text-[12px] text-slate-300">{ai.relevance_explanation}</p>
-                                                </div>
-                                                <div className="bg-indigo-500/10 p-3 rounded-xl border border-indigo-500/20">
-                                                  <p className="text-[10px] font-bold text-indigo-400 uppercase mb-1 flex items-center gap-1">
-                                                    <MessageSquare size={12} /> Suggested Angle
-                                                  </p>
-                                                  <p className="text-[12px] text-indigo-100 italic">{ai.response_angle}</p>
-                                                </div>
-                                              </div>
+                                            <div
+                                              className="flex items-center gap-1 px-2 py-1 bg-red-500/10 border border-red-500/20 rounded-lg"
+                                              title={ai.spam_indicators?.join(', ') || 'Suspected promotional or AI-generated content'}
+                                            >
+                                              <AlertTriangle size={12} className="text-red-400" />
+                                              <span className="text-[9px] font-black text-red-400 uppercase tracking-tighter">Possible AD</span>
                                             </div>
                                           );
-                                        } catch (e) {
-                                          return <div className="whitespace-pre-line">{thread.ai_analysis}</div>;
                                         }
-                                      })()}
+                                        return null;
+                                      } catch { return null; }
+                                    })()}
+                                    <div className="flex items-center gap-1.5 p-1 bg-slate-900/80 border border-slate-700/50 rounded-lg ml-2">
+                                      <button
+                                        onClick={(e) => { e.stopPropagation(); handleTriage(thread.id, 'agree'); }}
+                                        className={`p-1.5 rounded-md transition-all ${thread.triage_status === 'agree' ? 'bg-emerald-500 text-white shadow-lg shadow-emerald-500/20' : 'text-slate-500 hover:bg-slate-800 hover:text-emerald-400'}`}
+                                        title="Agree with this lead"
+                                      >
+                                        <ThumbsUp size={14} />
+                                      </button>
+                                      <button
+                                        onClick={(e) => { e.stopPropagation(); handleTriage(thread.id, 'disagree'); }}
+                                        className={`p-1.5 rounded-md transition-all ${thread.triage_status === 'disagree' ? 'bg-red-500 text-white shadow-lg shadow-red-500/20' : 'text-slate-500 hover:bg-slate-800 hover:text-red-400'}`}
+                                        title="Disagree with this lead"
+                                      >
+                                        <ThumbsDown size={14} />
+                                      </button>
                                     </div>
-
-                                    <h5 className="text-xs font-bold text-slate-500 uppercase tracking-widest flex items-center gap-2">
-                                      <MessageSquare size={14} className="text-indigo-400" /> Top Community Responses
-                                    </h5>
-                                    <CommentsSection postId={thread.id} />
                                   </div>
                                 </div>
                               </div>
+
+                              {isExpanded && (
+                                <div className="px-6 pb-6 pt-0 animate-in fade-in slide-in-from-top-2 duration-300">
+                                  <div className="border-t border-slate-800 pt-6 space-y-6">
+                                    {/* Tags Section */}
+                                    {signals && (
+                                      <div className="flex flex-wrap gap-2">
+                                        {signals.intents?.map(intent => (
+                                          <span key={intent} className="px-2 py-1 rounded-full bg-indigo-500/10 border border-indigo-500/20 text-[10px] font-bold text-indigo-400 uppercase">
+                                            {intent}
+                                          </span>
+                                        ))}
+                                        {signals.product_matches && signals.product_matches[selectedProduct.toLowerCase()] && (
+                                          <>
+                                            {signals.product_matches[selectedProduct.toLowerCase()].intents?.map(p_intent => (
+                                              <span key={p_intent} className="px-2 py-1 rounded-full bg-indigo-500/10 border border-indigo-500/20 text-[10px] font-bold text-cyan-400 uppercase">
+                                                {p_intent}
+                                              </span>
+                                            ))}
+                                            {signals.product_matches[selectedProduct.toLowerCase()].pain_points?.map(p_point => (
+                                              <span key={p_point} className="px-2 py-1 rounded-full bg-orange-500/10 border border-orange-500/20 text-[10px] font-bold text-orange-400 uppercase">
+                                                {p_point}
+                                              </span>
+                                            ))}
+                                          </>
+                                        )}
+                                      </div>
+                                    )}
+
+                                    {/* Analysis Section */}
+                                    <div className="grid grid-cols-2 gap-8">
+                                      <div className="space-y-3">
+                                        <h5 className="text-xs font-bold text-slate-500 uppercase tracking-widest flex items-center gap-2">
+                                          <FileText size={14} /> Full Thread Content
+                                        </h5>
+                                        <div className="text-sm text-slate-300 bg-slate-800/50 p-4 rounded-xl border border-slate-800 leading-relaxed max-h-64 overflow-y-auto custom-scrollbar">
+                                          {thread.body}
+                                          <div className="mt-4 pt-4 border-t border-slate-800">
+                                            <a href={thread.url} target="_blank" rel="noreferrer" className="text-indigo-400 hover:text-indigo-300 font-bold flex items-center gap-1">
+                                              Open Original Post <ExternalLink size={14} />
+                                            </a>
+                                          </div>
+                                        </div>
+
+                                        <h5 className="text-xs font-bold text-slate-500 uppercase tracking-widest flex items-center gap-2 mt-8">
+                                          <Sparkles size={14} className="text-purple-500" /> Profile Intelligence
+                                        </h5>
+                                        {thread.generatedResponse ? (
+                                          <ResponseCard
+                                            response={thread.generatedResponse}
+                                            postUrl={thread.url}
+                                            postId={thread.id}
+                                            productId={selectedProduct}
+                                            loading={thread.isRegenerating}
+                                            error={thread.genError}
+                                            availableStyles={['empathetic', 'helpful_expert', 'casual', 'technical', 'brief', 'product_referral']}
+                                            onRegenerate={(style) => {
+                                              const handleGen = async () => {
+                                                setThreads(prev => prev.map(t =>
+                                                  t.id === thread.id ? { ...t, isRegenerating: true, genError: null } : t
+                                                ));
+
+                                                try {
+                                                  const headers = await getAuthHeaders();
+                                                  const resp = await axios.post(`${API_BASE}/api/responses/generate/${thread.id}`, {
+                                                    product_id: selectedProduct,
+                                                    style: style
+                                                  }, { headers });
+                                                  setThreads(prev => prev.map(t =>
+                                                    t.id === thread.id ? { ...t, generatedResponse: resp.data, isRegenerating: false, genError: null } : t
+                                                  ));
+                                                } catch (err) {
+                                                  setThreads(prev => prev.map(t =>
+                                                    t.id === thread.id ? { ...t, isRegenerating: false, genError: "Failed to generate. Try again." } : t
+                                                  ));
+                                                }
+                                              };
+                                              handleGen();
+                                            }}
+                                          />
+                                        ) : (
+                                          <GenerateResponseButton
+                                            postId={thread.id}
+                                            productId={selectedProduct}
+                                            defaultStyle={productDefaultStyle}
+                                            onGenerated={(res) => {
+                                              setThreads(prev => prev.map(t =>
+                                                t.id === thread.id ? { ...t, generatedResponse: res, isRegenerating: false, genError: null } : t
+                                              ));
+                                            }}
+                                          />
+                                        )}
+                                      </div>
+
+                                      <div className="space-y-3">
+                                        <h5 className="text-xs font-bold text-slate-500 uppercase tracking-widest flex items-center gap-2">
+                                          <Zap size={14} className="text-yellow-500" /> AI Insight for {selectedProduct.toUpperCase()}
+                                        </h5>
+                                        <div className="text-sm text-slate-200 bg-indigo-500/5 p-6 rounded-2xl border border-indigo-500/10 leading-relaxed shadow-inner mb-6 space-y-4">
+                                          {(() => {
+                                            if (!thread.ai_analysis) return <p className="italic text-slate-500">AI analysis not required for this relevance level.</p>;
+                                            try {
+                                              const ai = JSON.parse(thread.ai_analysis);
+                                              if (ai.error) return <p className="text-red-400">Analysis failed: {ai.details}</p>;
+                                              return (
+                                                <div className="space-y-4">
+                                                  <div className="flex justify-between items-start gap-4">
+                                                    <div className="flex-1">
+                                                      <div className="flex items-center gap-2 mb-3">
+                                                        <div className="p-1 rounded bg-indigo-500/10 border border-indigo-500/20">
+                                                          <User size={10} className="text-indigo-400" />
+                                                        </div>
+                                                        <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">u/{ai.pain_author || thread.author}</span>
+                                                        {ai.is_from_comment ? (
+                                                          <span className="text-[9px] px-1.5 py-0.5 rounded-full bg-slate-800 text-slate-500 border border-slate-700 font-medium">Commenter</span>
+                                                        ) : (
+                                                          <span className="text-[9px] px-1.5 py-0.5 rounded-full bg-indigo-500/10 text-indigo-400 border border-indigo-500/20 font-medium">Author</span>
+                                                        )}
+                                                      </div>
+                                                      <p className="font-bold text-indigo-300 text-lg mb-1 leading-snug">{ai.pain_point_summary}</p>
+                                                      <p className="text-xs text-slate-400 italic">"{ai.pain_quote}"</p>
+                                                    </div>
+                                                    <div className="flex flex-col items-end gap-2">
+                                                      <span className={`px-2 py-1 rounded-md text-[10px] font-black uppercase tracking-tighter ${ai.urgency === 'High' ? 'bg-red-500/20 text-red-400 border border-red-500/30' :
+                                                        ai.urgency === 'Medium' ? 'bg-orange-500/20 text-orange-400 border border-orange-500/30' :
+                                                          'bg-slate-700/50 text-slate-400'
+                                                        }`}>
+                                                        {ai.urgency} Urgency
+                                                      </span>
+                                                      <div className="flex items-center gap-1">
+                                                        <div className="h-1.5 w-16 bg-slate-800 rounded-full overflow-hidden">
+                                                          <div className="h-full bg-indigo-500" style={{ width: `${(ai.product_relevance || 0) * 10}%` }}></div>
+                                                        </div>
+                                                        <span className="text-[10px] font-bold text-indigo-400">{ai.product_relevance}/10</span>
+                                                      </div>
+                                                      {/* Spam Warning in AI Section */}
+                                                      {ai.is_spam_or_ad && (
+                                                        <div className="px-2 py-1 rounded-md bg-red-500/20 border border-red-500/30">
+                                                          <span className="text-[10px] font-black text-red-400 uppercase tracking-tighter flex items-center gap-1">
+                                                            <AlertTriangle size={10} /> Possible AD
+                                                          </span>
+                                                        </div>
+                                                      )}
+                                                    </div>
+                                                  </div>
+
+                                                  <div className="grid grid-cols-1 gap-4 pt-4 border-t border-indigo-500/10">
+                                                    <div>
+                                                      <p className="text-[10px] font-bold text-slate-500 uppercase mb-1">Why it matters</p>
+                                                      <p className="text-[12px] text-slate-300">{ai.relevance_explanation}</p>
+                                                    </div>
+                                                    <div className="bg-indigo-500/10 p-3 rounded-xl border border-indigo-500/20">
+                                                      <p className="text-[10px] font-bold text-indigo-400 uppercase mb-1 flex items-center gap-1">
+                                                        <MessageSquare size={12} /> Suggested Angle
+                                                      </p>
+                                                      <p className="text-[12px] text-indigo-100 italic">{ai.response_angle}</p>
+                                                    </div>
+                                                    {/* Spam Indicators Warning */}
+                                                    {ai.is_spam_or_ad && ai.spam_indicators && ai.spam_indicators.length > 0 && (
+                                                      <div className="bg-red-500/10 p-3 rounded-xl border border-red-500/20 mt-2">
+                                                        <p className="text-[10px] font-bold text-red-400 uppercase mb-2 flex items-center gap-1">
+                                                          <AlertTriangle size={12} /> Warning: Possible Promotional Content
+                                                        </p>
+                                                        <ul className="text-[11px] text-red-300/80 space-y-1">
+                                                          {ai.spam_indicators.map((indicator, idx) => (
+                                                            <li key={idx} className="flex items-start gap-1.5">
+                                                              <span className="text-red-400 mt-0.5">•</span>
+                                                              <span>{indicator}</span>
+                                                            </li>
+                                                          ))}
+                                                        </ul>
+                                                      </div>
+                                                    )}
+                                                  </div>
+                                                </div>
+                                              );
+                                            } catch (e) {
+                                              return <div className="whitespace-pre-line">{thread.ai_analysis}</div>;
+                                            }
+                                          })()}
+                                        </div>
+
+                                        <h5 className="text-xs font-bold text-slate-500 uppercase tracking-widest flex items-center gap-2">
+                                          <MessageSquare size={14} className="text-indigo-400" /> Top Community Responses
+                                        </h5>
+                                        <CommentsSection postId={thread.id} />
+                                      </div>
+                                    </div>
+                                  </div>
+                                </div>
+                              )}
                             </div>
-                          )}
-                        </div>
-                      );
-                    })
-                  )}
-                </div>
+                          );
+                        })
+                      )}
+                    </div>
+                  </>
+                )}
               </>
             ) : (
               <ProductManagement
@@ -1593,14 +2098,22 @@ function MainApp() {
               />
             )}
             {showOnboarding && (
-              <OnboardingWizard
-                steps={discoverySteps}
+              <InteractiveOnboarding
                 onComplete={handleOnboardingComplete}
+                onOpenProductModal={() => {
+                  setShowOnboarding(false);
+                  openCreate();
+                }}
+                hasProducts={products.length > 0}
+                onStartSync={() => {
+                  setShowOnboarding(false);
+                  handleOnboardingComplete();
+                }}
               />
             )}
           </main>
-        </div>
-      </SignedIn>
+        </div >
+      </SignedIn >
     </>
   );
 }

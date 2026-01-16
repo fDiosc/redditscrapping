@@ -22,7 +22,9 @@ dependencies = [
     "tiktoken",
     "curl_cffi",
     "pytest",
-    "pytest-asyncio"
+    "pytest-asyncio",
+    "slowapi",
+    "celery[redis]"
 ]
 
 [tool.setuptools]

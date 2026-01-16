@@ -1,22 +1,38 @@
 import sqlite3
 import json
 import os
+import threading
 from typing import List, Dict, Any, Optional
 from radar.config import DATABASE_PATH
 
+# Lock for thread-safe database access
+_db_lock = threading.Lock()
+
 def get_connection():
+    """
+    Get a SQLite connection.
+    NOTE: Each call returns a new connection. The caller should NOT close it
+    if they want to keep using it within the same function.
+    """
     # Ensure directory exists
     db_dir = os.path.dirname(DATABASE_PATH)
     if db_dir and not os.path.exists(db_dir):
         os.makedirs(db_dir, exist_ok=True)
     
-    conn = sqlite3.connect(DATABASE_PATH, timeout=30)
+    conn = sqlite3.connect(DATABASE_PATH, timeout=30, check_same_thread=False)
     # Enable Write-Ahead Logging for better concurrency
     try:
         conn.execute("PRAGMA journal_mode=WAL")
+        conn.execute("PRAGMA busy_timeout=30000")  # 30 second busy timeout
     except:
         pass
+    
     return conn
+
+
+def close_thread_connection():
+    """Legacy function - no longer needed but kept for compatibility."""
+    pass
 
 def init_db():
     from radar.config import DATABASE_PATH
@@ -214,6 +230,13 @@ def init_db():
     except sqlite3.OperationalError:
         pass
 
+    # Migration: add embedding_vector to products (cached embedding as JSON)
+    try:
+        cursor.execute("ALTER TABLE products ADD COLUMN embedding_vector TEXT")
+        conn.commit()
+    except sqlite3.OperationalError:
+        pass
+
     conn.close()
 
 def save_post(post_data: Dict[str, Any]):
@@ -268,7 +291,8 @@ def save_comment(comment_data: Dict[str, Any]):
     conn.close()
 
 def save_analysis(post_id: str, product_id: str, user_id: str, data: Dict[str, Any], cursor=None):
-    """Save post analysis for a specific user's product. Preserves triage status on update."""
+    """Save post analysis for a specific user's product. Preserves triage status and existing AI on update."""
+    # Use COALESCE to preserve existing ai_analysis when new value is NULL
     query = """
     INSERT INTO post_analysis (
         post_id, product_id, user_id, relevance_score, semantic_similarity, 
@@ -279,7 +303,7 @@ def save_analysis(post_id: str, product_id: str, user_id: str, data: Dict[str, A
         relevance_score = excluded.relevance_score,
         semantic_similarity = excluded.semantic_similarity,
         community_score = excluded.community_score,
-        ai_analysis = excluded.ai_analysis,
+        ai_analysis = COALESCE(excluded.ai_analysis, post_analysis.ai_analysis),
         signals_json = excluded.signals_json,
         last_processed_score = excluded.last_processed_score,
         last_processed_comments = excluded.last_processed_comments,
@@ -300,6 +324,23 @@ def save_analysis(post_id: str, product_id: str, user_id: str, data: Dict[str, A
         cur.execute(query, params)
         conn.commit()
         conn.close()
+
+
+def get_existing_analysis(post_id: str, product_id: str, user_id: str):
+    """Get existing analysis for a post/product/user combo. Returns dict or None."""
+    conn = get_connection()
+    conn.row_factory = sqlite3.Row
+    cursor = conn.cursor()
+    cursor.execute("""
+        SELECT ai_analysis, relevance_score, semantic_similarity 
+        FROM post_analysis 
+        WHERE post_id = ? AND product_id = ? AND user_id = ?
+    """, (post_id, product_id, user_id))
+    row = cursor.fetchone()
+    conn.close()
+    if row:
+        return dict(row)
+    return None
 
 def update_triage_status(user_id: str, product_id: str, post_id: str, status: str):
     """Update triage status and record snapshots/history."""
@@ -453,6 +494,41 @@ def get_comments(post_id: str):
     conn.close()
     return [dict(row) for row in rows]
 
+
+def get_comments_bulk(post_ids: List[str]) -> Dict[str, List[Dict]]:
+    """
+    Fetch comments for multiple posts in a single query.
+    Returns a dict mapping post_id -> list of comments.
+    
+    This fixes the N+1 query problem when processing multiple posts.
+    """
+    if not post_ids:
+        return {}
+    
+    conn = get_connection()
+    conn.row_factory = sqlite3.Row
+    cursor = conn.cursor()
+    
+    placeholders = ', '.join(['?'] * len(post_ids))
+    cursor.execute(f"""
+        SELECT * FROM comments 
+        WHERE post_id IN ({placeholders})
+        ORDER BY post_id, score DESC
+    """, post_ids)
+    
+    rows = cursor.fetchall()
+    conn.close()
+    
+    # Group by post_id
+    result = {pid: [] for pid in post_ids}
+    for row in rows:
+        row_dict = dict(row)
+        post_id = row_dict['post_id']
+        if post_id in result:
+            result[post_id].append(row_dict)
+    
+    return result
+
 def get_sync_history(user_id: str = None, limit: int = 10):
     """Get sync history. If user_id provided, filter by user."""
     conn = get_connection()
@@ -539,6 +615,58 @@ def delete_product(product_id: str, user_id: str):
     cursor.execute("DELETE FROM products WHERE id = ? AND user_id = ?", (product_id, user_id))
     conn.commit()
     conn.close()
+
+
+def update_product_embedding(product_id: str, user_id: str, embedding: List[float], context: str = None):
+    """
+    Update the cached embedding for a product.
+    Stores the embedding as JSON for portability.
+    """
+    conn = get_connection()
+    cursor = conn.cursor()
+    
+    embedding_json = json.dumps(embedding)
+    
+    if context:
+        cursor.execute("""
+            UPDATE products 
+            SET embedding_vector = ?, embedding_context = ?, updated_at = CURRENT_TIMESTAMP
+            WHERE id = ? AND user_id = ?
+        """, (embedding_json, context, product_id, user_id))
+    else:
+        cursor.execute("""
+            UPDATE products 
+            SET embedding_vector = ?, updated_at = CURRENT_TIMESTAMP
+            WHERE id = ? AND user_id = ?
+        """, (embedding_json, product_id, user_id))
+    
+    conn.commit()
+    conn.close()
+
+
+def get_product_embedding(product_id: str, user_id: str) -> Optional[List[float]]:
+    """
+    Get the cached embedding for a product.
+    Returns None if no cached embedding exists.
+    """
+    conn = get_connection()
+    conn.row_factory = sqlite3.Row
+    cursor = conn.cursor()
+    
+    cursor.execute("""
+        SELECT embedding_vector FROM products 
+        WHERE id = ? AND user_id = ?
+    """, (product_id, user_id))
+    
+    row = cursor.fetchone()
+    conn.close()
+    
+    if row and row['embedding_vector']:
+        try:
+            return json.loads(row['embedding_vector'])
+        except (json.JSONDecodeError, TypeError):
+            return None
+    return None
 
 def save_generated_response(user_id: str, post_id: str, product_id: str, style: str, response_text: str, tokens_used: int):
     """Save a generated response for a user."""

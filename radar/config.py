@@ -88,26 +88,29 @@ PRODUCT_SIGNALS = {
 }
 
 # Scoring and Trigger Configuration
+# NOTE: Thresholds adjusted on 2026-01-15 to reduce false positives  
+# Original values: seeking_tool=5.0, complaint=3.0, comparison=2.0
+# Original AI: min_relevance=7.0, min_semantic_fit=0.40
 SCORING_CONFIG = {
     "intent_weights": {
-        "seeking_tool": 5.0,
-        "complaint": 3.0,
-        "comparison": 2.0
+        "seeking_tool": 3.5,    # Reduced from 5.0 - was too dominant
+        "complaint": 2.5,       # Reduced from 3.0
+        "comparison": 2.0       # Unchanged
     },
     "structural_gating": {
         "min_semantic_fit": 0.50,
         "require_product_context": True
     },
     "relevance_weights": {
-        "semantic_multiplier": 15.0,
-        "intensity_multiplier": 1.0 # Derived from log values
+        "semantic_multiplier": 12.0,  # Reduced from 15.0 to balance with intent
+        "intensity_multiplier": 1.0   # Derived from log values
     }
 }
 
 AI_TRIGGER_CONFIG = {
-    "min_relevance_score": 7.0,
-    "min_semantic_fit": 0.40,
-    "high_relevance_bypass": 15.0
+    "min_relevance_score": 10.0,    # Increased from 7.0 - more selective
+    "min_semantic_fit": 0.50,       # Increased from 0.40 - require better fit
+    "high_relevance_bypass": 18.0   # Increased from 15.0
 }
 
 # For backward compatibility and ease of import

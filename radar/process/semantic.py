@@ -30,35 +30,51 @@ def generate_product_context(product: Dict[str, Any]) -> str:
         
     return context.strip()
 
+
 class SemanticEngine:
     def __init__(self, user_id: str = None):
         self.product_embeddings = {} # Key: (user_id, product_id)
         self._initialize_products(user_id)
 
     def _initialize_products(self, user_id: str = None):
-        """Pre-calculate embeddings for products. If user_id is None, fetches all."""
-        from radar.storage.db import get_products
+        """
+        Pre-calculate embeddings for products. Uses cached embeddings if available.
+        If user_id is None, fetches all.
+        """
+        from radar.storage.db import get_products, get_product_embedding, update_product_embedding
         
         products = get_products(user_id=user_id)
         for product in products:
             p_user_id = product['user_id']
             p_id = product['id']
             
-            # Generate rich context
-            text = generate_product_context(product)
+            # Try to load cached embedding first
+            cached_embedding = get_product_embedding(p_id, p_user_id)
             
-            # For now, just generate the embedding
-            emb = get_embeddings([text])[0]
-            self.product_embeddings[(p_user_id, p_id)] = emb
+            if cached_embedding:
+                # Use cached embedding
+                self.product_embeddings[(p_user_id, p_id)] = cached_embedding
+            else:
+                # Generate and cache the embedding
+                text = generate_product_context(product)
+                emb = get_embeddings([text])[0]
+                self.product_embeddings[(p_user_id, p_id)] = emb
+                
+                # Cache for future use
+                update_product_embedding(p_id, p_user_id, emb, text)
 
     def refresh_product(self, product_id: str, user_id: str):
         """Regenerate and cache the embedding for a specific product."""
-        from radar.storage.db import get_product
+        from radar.storage.db import get_product, update_product_embedding
+        
         product = get_product(product_id, user_id=user_id)
         if product:
             text = generate_product_context(product)
             emb = get_embeddings([text])[0]
             self.product_embeddings[(user_id, product_id)] = emb
+            
+            # Update cache in database
+            update_product_embedding(product_id, user_id, emb, text)
 
     def get_product_fit(self, post_embedding: List[float], product_key: str, user_id: str) -> float:
         """Get similarity score between a post and a specific product."""

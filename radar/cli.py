@@ -77,6 +77,9 @@ def process(ai_analyze: bool = False, batch: int = 50, target_product: str = Non
     conn = get_connection()
     cursor = conn.cursor()
     
+    # Track errors for reporting
+    error_count = 0
+    
     for i in range(0, len(posts), batch):
         current_batch = posts[i:i+batch]
         
@@ -84,10 +87,24 @@ def process(ai_analyze: bool = False, batch: int = 50, target_product: str = Non
         from radar.storage.db import get_comments
         from radar.process.truncation import build_unified_context
         batch_texts = []
+        valid_posts = []  # Only include posts that succeeded
+        
         for p in current_batch:
-            comments = get_comments(p['id'])
-            unified = build_unified_context(p, comments)
-            batch_texts.append(unified)
+            try:
+                comments = get_comments(p['id'])
+                unified = build_unified_context(p, comments)
+                batch_texts.append(unified)
+                valid_posts.append(p)
+            except Exception as e:
+                error_count += 1
+                console.print(f"  [yellow]⚠ Skipped post {p['id'][:20]}... ({e})[/yellow]")
+                continue
+        
+        if not valid_posts:
+            console.print(f"[yellow]⚠ Batch {i//batch + 1} had no valid posts, skipping[/yellow]")
+            continue
+            
+        current_batch = valid_posts  # Use only valid posts going forward
             
         # 2. Generate Embeddings
         try:
@@ -150,9 +167,23 @@ def process(ai_analyze: bool = False, batch: int = 50, target_product: str = Non
                 if target_product and product_key != target_product:
                     should_ai_analyze = False
                 
+                # Check if AI analysis already exists (skip if not force mode)
+                if should_ai_analyze and not force:
+                    from radar.storage.db import get_existing_analysis
+                    existing = get_existing_analysis(post['id'], product_key, p_rec['user_id'])
+                    if existing and existing.get('ai_analysis'):
+                        # Reuse existing AI analysis
+                        ai_result = existing['ai_analysis']
+                        should_ai_analyze = False
+                
                 if should_ai_analyze:
-                    console.print(f"  [cyan]AI Analyzing for {product_key}: {post['title'][:40]}... (Sim: {similarity:.2f} | Score: {relevance:.1f})[/cyan]")
-                    ai_result = analyze_post_with_ai(unified_text, p_rec)
+                    try:
+                        console.print(f"  [cyan]AI Analyzing for {product_key}: {post['title'][:40]}... (Sim: {similarity:.2f} | Score: {relevance:.1f})[/cyan]")
+                        ai_result = analyze_post_with_ai(unified_text, p_rec)
+                    except Exception as e:
+                        error_count += 1
+                        console.print(f"  [yellow]⚠ AI error for {post['id'][:15]}...: {e}[/yellow]")
+                        ai_result = None
                 
                 # Save to specific analysis table
                 save_analysis(post['id'], product_key, p_rec['user_id'], {
@@ -179,6 +210,12 @@ def process(ai_analyze: bool = False, batch: int = 50, target_product: str = Non
         console.print(f"[green]✓ Processed batch {i//batch + 1}[/green]")
         
     conn.close()
+    
+    # Final summary
+    if error_count > 0:
+        console.print(f"[yellow]⚠ Completed with {error_count} skipped posts due to errors[/yellow]")
+    else:
+        console.print(f"[green]✓ All posts processed successfully[/green]")
 
 @app.command()
 def report(product: str, mode: str = "DIRECT_FIT", limit: int = 15, user_id: str = None):
