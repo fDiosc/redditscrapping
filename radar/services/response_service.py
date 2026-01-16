@@ -9,6 +9,12 @@ logger = logging.getLogger(__name__)
 RESPONSE_SYSTEM_PROMPT = """You are a helpful Reddit community member who genuinely wants to help others.
 {referral_guidance}
 
+## PRODUCT INFORMATION (USE ONLY THIS DATA - DO NOT INVENT FEATURES):
+Product Name: {product_name}
+Product Description: {product_description}
+Product Website: {product_website}
+Key Pain Points Solved: {product_pain_signals}
+
 Your responses must:
 1. Feel authentic and human - NOT like marketing copy or AI-generated
 2. Provide genuine value and insight FIRST
@@ -18,18 +24,21 @@ Your responses must:
 6. SOUND LIKE A HUMAN TYPING: Use natural flow, occasional lowercase at start of sentences, and casual sentence structures.
 7. NO HYPHENS: Strictly avoid using the hyphen character (-) anywhere in your response text. Use commas, periods, or just start new lines instead.
 
-CRITICAL RULES - NEVER BREAK THESE:
+CRITICAL GUARDRAILS - NEVER BREAK THESE:
 * {primary_promotion_rule}
+* **ONLY describe the product using the EXACT information provided above** - NEVER invent features, capabilities, or use cases not explicitly mentioned in the Product Description
+* **If you don't know a specific capability, DO NOT mention it** - stick to general statements like "it helped me with [pain point from their post]"
+* NEVER make up technical details, integrations, or features that aren't in the Product Description
 * NEVER use marketing phrases like "game-changer", "revolutionary", "amazing tool"
 * NEVER start with "Hey there!" or "Great question!" (too generic)
 * NEVER use bullet points or formatted lists (not natural for Reddit)
 * DO reference their specific words/situation to show you read their post
-* DO share genuine experiences
+* DO share genuine experiences BASED ONLY on what the product actually does (per description above)
 * DO sound like a real person who's been in their shoes
 * DO use casual language, contractions, and occasional typos feel OK
 * REMEMBER: NO HYPHENS (-) IN THE FINAL CONTENT.
 
-Remember: You're a community member FIRST, not a salesperson."""
+Remember: You're a community member FIRST, not a salesperson. And you ONLY know what the product description tells you."""
 
 STYLE_MODIFIERS = {
     "empathetic": """
@@ -130,8 +139,21 @@ Write the response now (plain text, no markdown formatting):"""
             referral_guidance = f"You have experience with {product['name']} but you NEVER directly promote it or mention it by name in this specific response style."
             primary_promotion_rule = "NEVER say 'I work for [product]' or 'You should try [product]'"
 
+        # Parse pain_signals from product (can be JSON string or list)
+        pain_signals = product.get('pain_signals', [])
+        if isinstance(pain_signals, str):
+            try:
+                import json
+                pain_signals = json.loads(pain_signals)
+            except:
+                pain_signals = [pain_signals] if pain_signals else []
+        pain_signals_str = ", ".join(pain_signals) if pain_signals else "Not specified"
+
         system_content = RESPONSE_SYSTEM_PROMPT.format(
             product_name=product['name'],
+            product_description=product.get('description', 'No description provided'),
+            product_website=product.get('website_url', 'No website provided'),
+            product_pain_signals=pain_signals_str,
             referral_guidance=referral_guidance,
             primary_promotion_rule=primary_promotion_rule
         )

@@ -1098,6 +1098,11 @@ function MainApp() {
   const [isChangelogOpen, setIsChangelogOpen] = useState(false);
   const [showOnboarding, setShowOnboarding] = useState(false);
 
+  // Advanced Filters
+  const [filterSubreddit, setFilterSubreddit] = useState("all");
+  const [filterTag, setFilterTag] = useState("all");
+  const [filterDateRange, setFilterDateRange] = useState("all"); // all, 1d, 7d, 30d
+
   const { isLoaded, isSignedIn, getToken } = useAuth();
   const { openSignUp, openSignIn } = useClerk();
 
@@ -1283,17 +1288,38 @@ function MainApp() {
   const handleSaveProduct = async (pData) => {
     try {
       const headers = await getAuthHeaders();
+      const isNewProduct = !editingProduct;
+
       if (editingProduct) {
         await axios.put(`${API_BASE}/api/products/${editingProduct.id}`, pData, { headers });
       } else {
         await axios.post(`${API_BASE}/api/products`, pData, { headers });
       }
+
       setIsModalOpen(false);
       setEditingProduct(null);
-      fetchProducts();
-      fetchConfig();
-    } catch (err) {
+      await fetchProducts();
+      await fetchConfig();
 
+      // Auto-sync for new products with subreddits
+      if (isNewProduct && pData.target_subreddits?.length > 0) {
+        const firstSub = pData.target_subreddits[0];
+        setSelectedProduct(pData.id);
+        setSelectedSubs([firstSub]);
+
+        try {
+          await axios.post(`${API_BASE}/api/sync`, null, {
+            params: { subreddits: [firstSub], days: 1, product: pData.id },
+            headers
+          });
+
+          // Show informative toast
+          alert(`🔍 Analyzing r/${firstSub}...\n\nThis may take 2-3 minutes. You'll see the results appear in the Discovery Dashboard.\n\n💡 Tip: Use "Run Intelligence Sync" in the sidebar to analyze more subreddits or refresh data.`);
+        } catch (syncErr) {
+          console.warn("Auto-sync failed, user can trigger manually", syncErr);
+        }
+      }
+    } catch (err) {
       alert("Failed to save product");
     }
   };
@@ -1333,12 +1359,38 @@ function MainApp() {
   });
 
   const filteredThreads = sortedThreads.filter(t => {
-    if (activeFilter === "fit") return t.semantic_similarity > 0.5;
-    if (activeFilter === "intensity") return t.community_score > 3.0;
-    if (activeFilter === "score") return t.relevance_score > 15.0;
-    if (activeFilter === "untriaged") return !t.triage_status;
+    // Existing stat filters
+    if (activeFilter === "fit" && t.semantic_similarity <= 0.5) return false;
+    if (activeFilter === "intensity" && t.community_score <= 3.0) return false;
+    if (activeFilter === "score" && t.relevance_score <= 15.0) return false;
+    if (activeFilter === "untriaged" && t.triage_status) return false;
+
+    // Subreddit filter
+    if (filterSubreddit !== "all" && t.source !== filterSubreddit) return false;
+
+    // Tag filter (intent signals) - signals.intents is an ARRAY like ["complaint", "seeking_tool"]
+    if (filterTag !== "all") {
+      const signals = t.signals_json ? JSON.parse(t.signals_json) : {};
+      const intents = signals.intents || [];
+      if (!intents.includes(filterTag)) return false;
+    }
+
+    // Date range filter
+    if (filterDateRange !== "all") {
+      const postDate = new Date(t.created_at);
+      const now = new Date();
+      const diffDays = (now - postDate) / (1000 * 60 * 60 * 24);
+      if (filterDateRange === "1d" && diffDays > 1) return false;
+      if (filterDateRange === "7d" && diffDays > 7) return false;
+      if (filterDateRange === "30d" && diffDays > 30) return false;
+    }
+
     return true;
   });
+
+  // Compute available subreddits and tags for filter dropdowns
+  const availableSubreddits = [...new Set(threads.map(t => t.source))].sort();
+  const availableTags = ["seeking_tool", "complaint", "comparison"];
 
   const productDefaultStyle = products.find(p => p.id === selectedProduct)?.default_response_style || "empathetic";
 
@@ -1426,17 +1478,27 @@ function MainApp() {
                 <section>
                   <label className="text-xs font-semibold uppercase tracking-wider text-slate-500 mb-2 block">Subreddits</label>
                   <div className="grid grid-cols-1 gap-2 max-h-40 overflow-y-auto p-1 custom-scrollbar">
-                    {config.subreddits.map(sub => (
-                      <label key={sub} className="flex items-center gap-3 cursor-pointer hover:text-white transition-colors">
-                        <input
-                          type="checkbox"
-                          checked={selectedSubs.includes(sub)}
-                          onChange={() => setSelectedSubs(prev => prev.includes(sub) ? prev.filter(s => s !== sub) : [...prev, sub])}
-                          className="rounded border-slate-700 bg-slate-800 text-indigo-600 focus:ring-offset-slate-900"
-                        />
-                        <span className="text-sm">r/{sub}</span>
-                      </label>
-                    ))}
+                    {(() => {
+                      // Get subreddits for selected product
+                      const selectedProductData = products.find(p => p.id === selectedProduct);
+                      let productSubs = selectedProductData?.target_subreddits || [];
+                      if (typeof productSubs === 'string') {
+                        try { productSubs = JSON.parse(productSubs); } catch { productSubs = []; }
+                      }
+                      return productSubs.length > 0 ? productSubs.map(sub => (
+                        <label key={sub} className="flex items-center gap-3 cursor-pointer hover:text-white transition-colors">
+                          <input
+                            type="checkbox"
+                            checked={selectedSubs.includes(sub)}
+                            onChange={() => setSelectedSubs(prev => prev.includes(sub) ? prev.filter(s => s !== sub) : [...prev, sub])}
+                            className="rounded border-slate-700 bg-slate-800 text-indigo-600 focus:ring-offset-slate-900"
+                          />
+                          <span className="text-sm">r/{sub}</span>
+                        </label>
+                      )) : (
+                        <p className="text-sm text-slate-500 italic">No subreddits configured for this product. Edit the product to add subreddits.</p>
+                      );
+                    })()}
                   </div>
                 </section>
 
@@ -1551,7 +1613,7 @@ function MainApp() {
                 <UserButton afterSignOutUrl="/" />
               </div>
               <div className="flex flex-col items-center gap-1">
-                <span className="text-[10px] text-slate-600 font-mono">SonarPro v0.0.3</span>
+                <span className="text-[10px] text-slate-600 font-mono">SonarPro v0.0.4</span>
                 <button
                   onClick={() => setIsChangelogOpen(true)}
                   className="text-[9px] text-indigo-400/60 hover:text-indigo-400 transition-colors uppercase tracking-widest font-bold"
@@ -1580,30 +1642,50 @@ function MainApp() {
                 <div className="p-8 max-h-[60vh] overflow-y-auto custom-scrollbar space-y-8">
                   <section>
                     <div className="flex items-center justify-between mb-4">
-                      <h3 className="text-lg font-bold text-white">v0.0.3</h3>
+                      <h3 className="text-lg font-bold text-white">v0.0.4</h3>
                       <span className="text-xs text-slate-500 font-mono italic">2026-01-16</span>
                     </div>
                     <div className="space-y-6">
                       <div className="group">
                         <h4 className="text-xs font-bold text-indigo-400 uppercase tracking-widest mb-2 flex items-center gap-2">
-                          <AlertTriangle size={14} /> AI Ad & Spam Detection
+                          🛡️ AI Response Guardrails
                         </h4>
                         <ul className="text-sm text-slate-300 space-y-2 list-disc pl-4 marker:text-indigo-500">
-                          <li><strong className="text-slate-200">Intent Analysis</strong>: UI now identifies "Hard Ads" vs "Insightful Founders".</li>
-                          <li><strong className="text-slate-200">Warning Badges</strong>: Visual cues for possible advertising content.</li>
-                          <li><strong className="text-slate-200">Spam Indicators</strong>: Detailed explanations in AI Insight view.</li>
+                          <li><strong className="text-slate-200">Product-Based Responses</strong>: AI now uses your actual product description.</li>
+                          <li><strong className="text-slate-200">No Invented Features</strong>: AI only mentions capabilities from your registration.</li>
                         </ul>
                       </div>
                       <div className="group">
                         <h4 className="text-xs font-bold text-emerald-400 uppercase tracking-widest mb-2 flex items-center gap-2">
-                          <CheckCircle2 size={14} /> Pipeline Robustness
+                          🚀 Improved Onboarding
                         </h4>
                         <ul className="text-sm text-slate-300 space-y-2 list-disc pl-4 marker:text-emerald-500">
-                          <li>Added per-post failsafes to prevent batch crashes.</li>
-                          <li>Fixed NoneType errors on empty post content.</li>
+                          <li><strong className="text-slate-200">Auto-Sync</strong>: New products automatically trigger first subreddit analysis.</li>
+                          <li><strong className="text-slate-200">Clear Instructions</strong>: Toast explains wait time and next steps.</li>
+                        </ul>
+                      </div>
+                      <div className="group">
+                        <h4 className="text-xs font-bold text-cyan-400 uppercase tracking-widest mb-2 flex items-center gap-2">
+                          📂 Product-Specific Subreddits
+                        </h4>
+                        <ul className="text-sm text-slate-300 space-y-2 list-disc pl-4 marker:text-cyan-500">
+                          <li>Sidebar shows only the selected product's subreddits.</li>
+                          <li>Switching products updates the subreddit list.</li>
                         </ul>
                       </div>
                     </div>
+                  </section>
+
+                  <section className="pt-6 border-t border-slate-800">
+                    <div className="flex items-center justify-between mb-4">
+                      <h3 className="text-lg font-bold text-slate-400">v0.0.3</h3>
+                      <span className="text-xs text-slate-600 font-mono">2026-01-16</span>
+                    </div>
+                    <ul className="text-sm text-slate-500 space-y-2 list-disc pl-4 border-l-2 border-slate-800">
+                      <li>AI Ad & Spam Detection with intent analysis.</li>
+                      <li>Pipeline robustness with per-post failsafes.</li>
+                      <li>Warning badges for possible marketing content.</li>
+                    </ul>
                   </section>
 
                   <section className="pt-6 border-t border-slate-800">
@@ -1615,7 +1697,6 @@ function MainApp() {
                       <li>Interactive Onboarding for new users.</li>
                       <li>Smart Product Setup with URL auto-extraction.</li>
                       <li>Celery + Redis async background processing.</li>
-                      <li>Memory leak and performance optimizations.</li>
                     </ul>
                   </section>
                 </div>
@@ -1761,26 +1842,91 @@ function MainApp() {
 
                     {/* Threads List */}
                     <div className="space-y-4">
-                      <div className="flex items-center justify-between mb-6">
-                        <h3 className="text-xl font-bold text-white flex items-center gap-3">
-                          <AlertTriangle className="text-yellow-500" />
-                          Intelligence Results
-                        </h3>
+                      {/* Filter Bar */}
+                      <div className="flex flex-wrap items-center gap-3 mb-6 p-4 bg-slate-900/50 rounded-xl border border-slate-800">
+                        {/* Subreddit Filter */}
+                        <div className="flex items-center gap-2">
+                          <label className="text-[10px] text-slate-500 uppercase tracking-widest">Subreddit</label>
+                          <select
+                            value={filterSubreddit}
+                            onChange={(e) => setFilterSubreddit(e.target.value)}
+                            className="bg-slate-800 border border-slate-700 rounded-lg px-3 py-1.5 text-sm text-slate-200 focus:ring-2 focus:ring-indigo-500 outline-none"
+                          >
+                            <option value="all">All</option>
+                            {availableSubreddits.map(sub => (
+                              <option key={sub} value={sub}>r/{sub}</option>
+                            ))}
+                          </select>
+                        </div>
 
-                        <div className="flex bg-slate-900 p-1 rounded-lg border border-slate-800">
+                        {/* Tag Filter */}
+                        <div className="flex items-center gap-2">
+                          <label className="text-[10px] text-slate-500 uppercase tracking-widest">Tag</label>
+                          <select
+                            value={filterTag}
+                            onChange={(e) => setFilterTag(e.target.value)}
+                            className="bg-slate-800 border border-slate-700 rounded-lg px-3 py-1.5 text-sm text-slate-200 focus:ring-2 focus:ring-indigo-500 outline-none"
+                          >
+                            <option value="all">All</option>
+                            {availableTags.map(tag => (
+                              <option key={tag} value={tag}>{tag.replace("_", " ").toUpperCase()}</option>
+                            ))}
+                          </select>
+                        </div>
+
+                        {/* Date Range Filter */}
+                        <div className="flex items-center gap-2">
+                          <label className="text-[10px] text-slate-500 uppercase tracking-widest">Date</label>
+                          <select
+                            value={filterDateRange}
+                            onChange={(e) => setFilterDateRange(e.target.value)}
+                            className="bg-slate-800 border border-slate-700 rounded-lg px-3 py-1.5 text-sm text-slate-200 focus:ring-2 focus:ring-indigo-500 outline-none"
+                          >
+                            <option value="all">All Time</option>
+                            <option value="1d">Last 24h</option>
+                            <option value="7d">Last 7 Days</option>
+                            <option value="30d">Last 30 Days</option>
+                          </select>
+                        </div>
+
+                        {/* Spacer */}
+                        <div className="flex-1" />
+
+                        {/* Clear Filters Button */}
+                        {(filterSubreddit !== "all" || filterTag !== "all" || filterDateRange !== "all" || activeFilter !== "all") && (
+                          <button
+                            onClick={() => {
+                              setFilterSubreddit("all");
+                              setFilterTag("all");
+                              setFilterDateRange("all");
+                              setActiveFilter("all");
+                            }}
+                            className="px-3 py-1.5 text-xs text-red-400 hover:text-red-300 font-bold transition-colors"
+                          >
+                            Clear Filters
+                          </button>
+                        )}
+
+                        {/* Sort Buttons */}
+                        <div className="flex bg-slate-800 p-1 rounded-lg border border-slate-700">
                           <button
                             onClick={() => setSortBy("highest")}
-                            className={`px-4 py-1.5 rounded-md text-xs font-bold transition-all ${sortBy === "highest" ? "bg-indigo-600 text-white" : "text-slate-500 hover:text-slate-300"}`}
+                            className={`px-3 py-1 rounded-md text-xs font-bold transition-all ${sortBy === "highest" ? "bg-indigo-600 text-white" : "text-slate-500 hover:text-slate-300"}`}
                           >
-                            Sort by Highest
+                            Highest
                           </button>
                           <button
                             onClick={() => setSortBy("newest")}
-                            className={`px-4 py-1.5 rounded-md text-xs font-bold transition-all ${sortBy === "newest" ? "bg-indigo-600 text-white" : "text-slate-500 hover:text-slate-300"}`}
+                            className={`px-3 py-1 rounded-md text-xs font-bold transition-all ${sortBy === "newest" ? "bg-indigo-600 text-white" : "text-slate-500 hover:text-slate-300"}`}
                           >
-                            Sort by Newest
+                            Newest
                           </button>
                         </div>
+
+                        {/* Results Count */}
+                        <span className="text-xs text-slate-500">
+                          {filteredThreads.length} of {threads.length}
+                        </span>
                       </div>
 
                       {loading ? (
@@ -1790,7 +1936,12 @@ function MainApp() {
                           <Search className="mb-4 opacity-20" size={48} />
                           <p className="text-lg font-medium">No results match this filter</p>
                           <button
-                            onClick={() => setActiveFilter("all")}
+                            onClick={() => {
+                              setFilterSubreddit("all");
+                              setFilterTag("all");
+                              setFilterDateRange("all");
+                              setActiveFilter("all");
+                            }}
                             className="mt-4 text-indigo-400 hover:text-indigo-300 font-bold"
                           >
                             Clear all filters
@@ -1821,6 +1972,33 @@ function MainApp() {
                                     <span className="px-2 py-0.5 rounded bg-slate-800 text-[10px] font-bold text-indigo-300 uppercase">r/{thread.source}</span>
                                     <span className="text-[10px] text-slate-500">●</span>
                                     <span className="text-[10px] text-slate-500">{new Date(thread.created_at).toLocaleDateString()}</span>
+                                    {/* Intent Tags */}
+                                    {signals && signals.intents && signals.intents.length > 0 && (
+                                      <>
+                                        <span className="text-[10px] text-slate-500">●</span>
+                                        {signals.intents.map(intent => (
+                                          <span key={intent} className="px-2 py-0.5 rounded-full bg-cyan-500/10 border border-cyan-500/20 text-[9px] font-bold text-cyan-400 uppercase">
+                                            {intent.replace("_", " ")}
+                                          </span>
+                                        ))}
+                                      </>
+                                    )}
+                                    {/* Product-specific intents */}
+                                    {signals && signals.product_matches && signals.product_matches[selectedProduct?.toLowerCase?.()] && signals.product_matches[selectedProduct.toLowerCase()].intents?.length > 0 && (
+                                      signals.product_matches[selectedProduct.toLowerCase()].intents.map(p_intent => (
+                                        <span key={p_intent} className="px-2 py-0.5 rounded-full bg-emerald-500/10 border border-emerald-500/20 text-[9px] font-bold text-emerald-400 uppercase">
+                                          {p_intent}
+                                        </span>
+                                      ))
+                                    )}
+                                    {/* Product-specific pain points */}
+                                    {signals && signals.product_matches && signals.product_matches[selectedProduct?.toLowerCase?.()] && signals.product_matches[selectedProduct.toLowerCase()].pain_points?.length > 0 && (
+                                      signals.product_matches[selectedProduct.toLowerCase()].pain_points.map(p_point => (
+                                        <span key={p_point} className="px-2 py-0.5 rounded-full bg-orange-500/10 border border-orange-500/20 text-[9px] font-bold text-orange-400 uppercase">
+                                          {p_point}
+                                        </span>
+                                      ))
+                                    )}
                                   </div>
                                   <h4 className="text-lg font-bold text-slate-100 group-hover:text-white leading-tight">{thread.title}</h4>
                                   {!isExpanded && <p className="text-sm text-slate-400 line-clamp-2 leading-relaxed">{thread.body}</p>}
@@ -1894,30 +2072,6 @@ function MainApp() {
                               {isExpanded && (
                                 <div className="px-6 pb-6 pt-0 animate-in fade-in slide-in-from-top-2 duration-300">
                                   <div className="border-t border-slate-800 pt-6 space-y-6">
-                                    {/* Tags Section */}
-                                    {signals && (
-                                      <div className="flex flex-wrap gap-2">
-                                        {signals.intents?.map(intent => (
-                                          <span key={intent} className="px-2 py-1 rounded-full bg-indigo-500/10 border border-indigo-500/20 text-[10px] font-bold text-indigo-400 uppercase">
-                                            {intent}
-                                          </span>
-                                        ))}
-                                        {signals.product_matches && signals.product_matches[selectedProduct.toLowerCase()] && (
-                                          <>
-                                            {signals.product_matches[selectedProduct.toLowerCase()].intents?.map(p_intent => (
-                                              <span key={p_intent} className="px-2 py-1 rounded-full bg-indigo-500/10 border border-indigo-500/20 text-[10px] font-bold text-cyan-400 uppercase">
-                                                {p_intent}
-                                              </span>
-                                            ))}
-                                            {signals.product_matches[selectedProduct.toLowerCase()].pain_points?.map(p_point => (
-                                              <span key={p_point} className="px-2 py-1 rounded-full bg-orange-500/10 border border-orange-500/20 text-[10px] font-bold text-orange-400 uppercase">
-                                                {p_point}
-                                              </span>
-                                            ))}
-                                          </>
-                                        )}
-                                      </div>
-                                    )}
 
                                     {/* Analysis Section */}
                                     <div className="grid grid-cols-2 gap-8">

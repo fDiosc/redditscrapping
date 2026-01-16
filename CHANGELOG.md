@@ -1,5 +1,27 @@
 # SonarPro Release Notes
 
+## v0.0.4 (2026-01-16)
+
+### 🛡️ AI Response Guardrails
+- **Product-Based Responses**: AI now uses actual product description, website, and pain signals from your registration.
+- **No More Invented Features**: Strict rules prevent AI from making up capabilities not in your product description.
+- **Accurate Recommendations**: Responses are now grounded in real product data.
+
+### 🚀 Improved Onboarding
+- **Auto-Sync on Product Creation**: After registering a product, automatically syncs the first subreddit (1 day of data).
+- **Clear Instructions**: Toast message explains wait time and how to run additional syncs.
+
+### 📂 Product-Specific Subreddits
+- **Sidebar shows only relevant subs**: When switching products, subreddit list updates to show only that product's configured subreddits.
+- **Better organization**: No more mixing subreddits from different products.
+
+### 🔍 Filter Improvements
+- **Filter Bar**: Replaced "Intelligence Results" header with actionable filters (Subreddit, Tag, Date Range).
+- **Intent Tags in Header**: Tags now display directly in thread cards without expanding.
+- **Fixed Tag Filter**: Corrected filter logic for intent-based filtering.
+
+---
+
 ## v0.0.3 (2026-01-16)
 
 ### 🚨 AI Ad & Spam Detection
